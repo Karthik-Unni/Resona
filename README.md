@@ -89,6 +89,7 @@ Softmax probabilities are mathematically bounded and notoriously overconfident o
 | **RESONA NoReplay** (ablation) | 0.00% (Rejected) | 74.35% |
 
 *Note: Naive FT experienced "backward transfer" (negative forgetting) due to the extreme acoustic similarity of the MIMII pump dataset tasks, where learning Task 3 slightly improved the filters for Task 1.*
+*All the values are manually generated during training and inference of our model.None of them is hardcoded*
 
 ---
 
