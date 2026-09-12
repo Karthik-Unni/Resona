@@ -14,7 +14,10 @@ class ContinualLearner:
     def __init__(self, config):
         self.config = config
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = SimpleCNN().to(self.device)
+        
+        self.num_classes = config.get("num_classes", 2)
+        # Instantiate the custom SimpleCNN
+        self.model = SimpleCNN(input_channels=1, num_classes=self.num_classes).to(self.device)
         
         self.method = config.get("method", "RESONA_Replay")
         self.buffer = ReplayBuffer(memory_budget_per_class=config.get("memory_budget_per_class", 100))

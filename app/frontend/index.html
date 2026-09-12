@@ -1,220 +1,926 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>RESONA - Adaptive Acoustic Intelligence</title>
-    <style>
-        :root {
-            --bg: #0f172a;
-            --surface: #1e293b;
-            --text: #f8fafc;
-            --primary: #3b82f6;
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --danger: #ef4444;
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>RESONA Acoustic Machine Monitoring System</title>
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["IBM Plex Sans", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"]
+          }
         }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            margin: 0;
-            padding: 20px;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .header h1 {
-            background: linear-gradient(90deg, #60a5fa, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: 2.5rem;
-            margin: 0;
-        }
-        .container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .card {
-            background: var(--surface);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 8px 16px;
-            border-radius: 9999px;
-            font-weight: bold;
-            font-size: 1.2rem;
-            margin-top: 10px;
-        }
-        .NORMAL { background: rgba(34, 197, 94, 0.2); color: var(--success); }
-        .KNOWN_ANOMALY { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
-        .UNKNOWN_CONDITION { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
-        
-        .controls button {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 6px;
-            cursor: pointer;
-            margin: 5px;
-            font-weight: bold;
-        }
-        .controls button:hover {
-            opacity: 0.9;
-        }
-        .metric {
-            display: flex;
-            justify-content: space-between;
-            margin: 10px 0;
-            padding: 10px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 6px;
-        }
-        #human-review-panel {
-            display: none;
-            margin-top: 20px;
-            padding: 15px;
-            border: 2px dashed var(--warning);
-            border-radius: 8px;
-        }
-        #qr-code {
-            text-align: center;
-            margin-top: 20px;
-        }
-        #qr-code img {
-            border: 10px solid white;
-            border-radius: 8px;
-        }
-    </style>
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'IBM Plex Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .tab-btn.active { border-bottom: 2px solid #0f172a; color: #0f172a; font-weight: 600; }
+    .status-normal { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .status-anomaly { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .status-unknown { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .status-new { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+    .pulse-dot { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    #spectrogram-canvas { background: #111827; border-radius: 4px; }
+  </style>
 </head>
-<body>
-    <div class="header">
-        <h1>RESONA</h1>
-        <p>Adaptive Acoustic Intelligence for Machine Monitoring</p>
+<body class="bg-[#F8F9FA] text-slate-800 antialiased min-h-screen flex flex-col">
+
+<!-- HEADER -->
+<header class="bg-white border-b border-slate-100 sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
+    <div class="flex items-center space-x-10">
+      <div class="flex items-baseline space-x-3">
+        <span class="text-lg font-bold tracking-wider text-slate-900">RESONA</span>
+        <span class="text-xs font-mono text-slate-400 tracking-wide">ACOUSTIC HMI</span>
+      </div>
+      <nav class="hidden md:flex items-center space-x-1 text-sm">
+        <button onclick="showTab('overview')" id="tab-overview" class="tab-btn active px-3 py-1.5 text-slate-900 border-b-2 border-slate-900">Overview</button>
+        <button onclick="showTab('review')" id="tab-review" class="tab-btn px-3 py-1.5 text-slate-500 hover:text-slate-900 border-b-2 border-transparent transition-colors">Review Queue</button>
+        <button onclick="showTab('demo')" id="tab-demo" class="tab-btn px-3 py-1.5 text-slate-500 hover:text-slate-900 border-b-2 border-transparent transition-colors">Live Demo</button>
+        <button onclick="showTab('metrics')" id="tab-metrics" class="tab-btn px-3 py-1.5 text-slate-500 hover:text-slate-900 border-b-2 border-transparent transition-colors">Evaluation</button>
+      </nav>
+    </div>
+    <div class="flex items-center space-x-5 text-xs font-mono text-slate-400">
+      <div class="flex items-center space-x-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-dot"></span>
+        <span class="text-slate-600">System Operational</span>
+      </div>
+      <span class="hidden sm:inline" id="live-clock">--:-- UTC</span>
+      <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500">DEMO SESSION</span>
+      <div class="w-8 h-8 rounded-full bg-[#0f4c81] flex items-center justify-center text-white">
+        <span class="material-symbols-outlined text-base">person</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="flex-1 max-w-7xl mx-auto px-8 py-8 w-full">
+
+  <!-- ======= OVERVIEW TAB ======= -->
+  <div id="tab-content-overview">
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 pb-5 border-b border-slate-200/60 gap-4">
+      <div>
+        <h1 class="text-2xl font-light text-slate-900 tracking-tight">Plant Overview</h1>
+        <p class="text-slate-500 text-sm mt-1">Real-time acoustic condition monitoring — MIMII Dataset · 0 dB SNR</p>
+      </div>
+      <div class="flex items-center space-x-4 text-sm">
+        <div class="flex items-center space-x-2">
+          <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+          <span class="text-slate-700 font-medium">Attention Required</span>
+          <span class="text-xs text-slate-400 font-mono">(36/36 nodes connected)</span>
+        </div>
+        <button onclick="refreshTelemetry()" class="flex items-center space-x-1.5 text-xs text-slate-500 hover:text-slate-900 font-mono transition-colors">
+          <span class="material-symbols-outlined text-sm" id="refresh-icon">refresh</span>
+          <span>Refresh</span>
+        </button>
+      </div>
     </div>
 
-    <div class="container">
-        <!-- Live Monitor -->
-        <div class="card">
-            <h2>Live Monitor</h2>
-            <div style="font-size: 1.2rem;">Machine ID: <strong id="machine-id">pump_00</strong></div>
-            <div id="status-badge" class="status-badge NORMAL">🟢 NORMAL</div>
-            
-            <div style="margin-top: 20px;">
-                <div class="metric">
-                    <span>Confidence (Known Classes):</span>
-                    <strong id="confidence">0.00%</strong>
-                </div>
-                <div class="metric">
-                    <span>Unknown/OOD Score:</span>
-                    <strong id="unknown-score">0.00</strong>
-                </div>
-                <div class="metric">
-                    <span>Agent Action:</span>
-                    <strong id="agent-action">LOG_ONLY</strong>
-                </div>
-            </div>
-
-            <div id="human-review-panel">
-                <h3 style="color: var(--warning); margin-top:0;">⚠️ Human Verification Required</h3>
-                <p>The model detected a sound pattern outside its known distribution. Please verify:</p>
-                <button onclick="submitFeedback('NORMAL')" style="background: var(--success);">NORMAL</button>
-                <button onclick="submitFeedback('KNOWN ANOMALY')" style="background: var(--danger);">KNOWN ANOMALY</button>
-                <button onclick="submitFeedback('NEW CONDITION')" style="background: var(--warning);">NEW CONDITION</button>
-            </div>
-            
-            <div id="qr-code">
-                <p>Scan to Monitor on Mobile</p>
-                <!-- Using a public API for QR generation for demo -->
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=RESONA-Mobile-View-Pump-00" alt="QR Code">
-            </div>
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+      <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
+        <span class="text-xs font-mono text-slate-400 uppercase tracking-wider">AI Model Status</span>
+        <div>
+          <div class="text-2xl font-light text-slate-900 flex items-center space-x-2">
+            <span id="kpi-status">Operational</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+          </div>
+          <p class="text-xs text-slate-400 mt-1 font-mono">SimpleCNN · Continual Learning v3</p>
         </div>
-
-        <!-- Demo Controls -->
-        <div class="card">
-            <h2>Demo Scenarios</h2>
-            <div class="controls">
-                <button onclick="runTestCase(1)">1. Normal Machine</button>
-                <button onclick="runTestCase(2)">2. Known Anomaly</button>
-                <button onclick="runTestCase(3)">3. Noisy Normal</button>
-                <button onclick="runTestCase(4)">4. Noisy Anomaly</button>
-                <button onclick="runTestCase(5)">5. Unknown Condition</button>
-            </div>
-            
-            <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
-            
-            <h2>Continual Learning Results</h2>
-            <button onclick="fetchResults()" style="background: #8b5cf6;">Load Evaluation Metrics</button>
-            <pre id="results-display" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 6px; overflow-x: auto; margin-top: 15px;">
-Results will appear here...
-            </pre>
+      </div>
+      <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
+        <span class="text-xs font-mono text-slate-400 uppercase tracking-wider">Active Anomalies</span>
+        <div>
+          <div class="text-2xl font-light text-slate-900" id="kpi-anomalies">01</div>
+          <p class="text-xs text-slate-400 mt-1">Pump 02 · Zone B</p>
         </div>
+      </div>
+      <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
+        <span class="text-xs font-mono text-slate-400 uppercase tracking-wider">Avg Forgetting (RESONA)</span>
+        <div>
+          <div class="text-2xl font-light text-emerald-600">3.55%</div>
+          <p class="text-xs text-slate-400 mt-1">vs Naive baseline: 86.80%</p>
+        </div>
+      </div>
+      <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex flex-col justify-between h-36">
+        <span class="text-xs font-mono text-slate-400 uppercase tracking-wider">Monitored Fleet</span>
+        <div>
+          <div class="text-2xl font-light text-slate-900">36<span class="text-base text-slate-400 font-normal"> / 36</span></div>
+          <p class="text-xs text-slate-400 mt-1">4 zones · Pump 00, 02, 04 active</p>
+        </div>
+      </div>
     </div>
 
-    <script>
-        const API_URL = 'http://localhost:5000/api';
+    <!-- Issues + Zones -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-12">
+      <section class="lg:col-span-7">
+        <div class="flex items-center justify-between mb-5">
+          <div class="flex items-center space-x-3">
+            <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Active Issues</h2>
+            <span class="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">2 events</span>
+          </div>
+          <span class="text-xs font-mono text-slate-400">Escalation window: 42m</span>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-100">
+          <div class="p-5 hover:bg-slate-50/50 transition-colors">
+            <div class="flex items-start justify-between">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-2">
+                  <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                  <span class="font-medium text-slate-900">Pump 02</span>
+                  <span class="text-xs font-mono text-slate-400">· Zone B (Heavy Drive)</span>
+                </div>
+                <p class="text-sm text-slate-600">Continuous acoustic anomaly mismatch vs baseline threshold</p>
+                <div class="text-xs font-mono text-slate-400 flex items-center space-x-4">
+                  <span>Detected 10:42 AM</span><span>18m elapsed</span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button onclick="handleAcknowledge(this)" class="px-3 py-1.5 text-xs font-mono rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors">Acknowledge</button>
+                <button onclick="showTab('demo'); runTestCase(2)" class="px-3 py-1.5 text-xs font-mono rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors">Simulate →</button>
+              </div>
+            </div>
+          </div>
+          <div class="p-5 hover:bg-slate-50/50 transition-colors">
+            <div class="flex items-start justify-between">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-2">
+                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span class="font-medium text-slate-900">Fan 02</span>
+                  <span class="text-xs font-mono text-slate-400">· Zone C (Air Handling)</span>
+                </div>
+                <p class="text-sm text-slate-600">Unfamiliar acoustic condition diverges from known clusters — OOD flagged</p>
+                <div class="text-xs font-mono text-slate-400 flex items-center space-x-4">
+                  <span>Detected 10:51 AM</span><span>9m elapsed</span>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button onclick="showTab('review')" class="px-3 py-1.5 text-xs font-mono rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors">Review Queue →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="lg:col-span-5">
+        <div class="flex items-center justify-between mb-5">
+          <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Monitored Zones</h2>
+          <span class="text-xs font-mono text-slate-400">4 total</span>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-100">
+          <div class="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+            <div>
+              <div class="flex items-center space-x-2"><span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span><span class="font-medium text-slate-800 text-sm">Zone A</span><span class="text-xs text-slate-400">· Primary Compressor</span></div>
+              <span class="text-xs font-mono text-slate-400 mt-1 block pl-3.5">12 machines · Pump 00 Nominal</span>
+            </div>
+            <span class="text-xs font-mono text-slate-400">OK</span>
+          </div>
+          <div class="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+            <div>
+              <div class="flex items-center space-x-2"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span><span class="font-medium text-slate-800 text-sm">Zone B</span><span class="text-xs text-slate-400">· Heavy Drive</span></div>
+              <span class="text-xs font-mono text-rose-500 mt-1 block pl-3.5">8 machines · 1 active anomaly (Pump 02)</span>
+            </div>
+            <span class="text-xs font-mono text-rose-600 font-medium">ALERT</span>
+          </div>
+          <div class="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+            <div>
+              <div class="flex items-center space-x-2"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><span class="font-medium text-slate-800 text-sm">Zone C</span><span class="text-xs text-slate-400">· Air Handling</span></div>
+              <span class="text-xs font-mono text-slate-500 mt-1 block pl-3.5">6 machines · 1 review pending (Fan 02)</span>
+            </div>
+            <span class="text-xs font-mono text-amber-600 font-medium">REVIEW</span>
+          </div>
+          <div class="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+            <div>
+              <div class="flex items-center space-x-2"><span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span><span class="font-medium text-slate-800 text-sm">Zone D</span><span class="text-xs text-slate-400">· Valve Battery</span></div>
+              <span class="text-xs font-mono text-slate-400 mt-1 block pl-3.5">10 machines · Pump 04 Nominal</span>
+            </div>
+            <span class="text-xs font-mono text-slate-400">OK</span>
+          </div>
+        </div>
+      </section>
+    </div>
 
-        async function updateDashboard(state, event) {
-            document.getElementById('machine-id').innerText = state.current_machine;
-            
-            const badge = document.getElementById('status-badge');
-            badge.innerText = state.status;
-            badge.className = `status-badge ${state.status.replace(' ', '_')}`;
-            
-            if (state.status.includes("NORMAL")) badge.innerText = "🟢 " + state.status;
-            if (state.status.includes("ANOMALY")) badge.innerText = "🔴 " + state.status;
-            if (state.status.includes("UNKNOWN")) badge.innerText = "⚠️ " + state.status;
+    <!-- Event Log -->
+    <section class="mb-8">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Chronological Event Log</h2>
+        <span class="text-xs font-mono text-slate-400">Past 2 Hours</span>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+        <table class="w-full text-left text-sm">
+          <thead><tr class="border-b border-slate-100 text-xs font-mono text-slate-400">
+            <th class="py-3 px-5 font-normal w-28">Time</th>
+            <th class="py-3 px-5 font-normal w-44">Asset</th>
+            <th class="py-3 px-5 font-normal">Observation</th>
+            <th class="py-3 px-5 font-normal text-right w-40">Status</th>
+          </tr></thead>
+          <tbody class="divide-y divide-slate-50 text-slate-600">
+            <tr class="hover:bg-slate-50/50 transition-colors">
+              <td class="py-3 px-5 font-mono text-xs text-slate-400">10:51 AM</td>
+              <td class="py-3 px-5 font-medium text-slate-800">Fan 02 <span class="text-xs font-normal text-slate-400">· Zone C</span></td>
+              <td class="py-3 px-5 text-slate-600">Unfamiliar acoustic condition. Mahalanobis OOD score: 95.6. Queued for human verification.</td>
+              <td class="py-3 px-5 text-right font-mono text-xs text-amber-600">Pending Review</td>
+            </tr>
+            <tr class="hover:bg-slate-50/50 transition-colors">
+              <td class="py-3 px-5 font-mono text-xs text-slate-400">10:42 AM</td>
+              <td class="py-3 px-5 font-medium text-slate-800">Pump 02 <span class="text-xs font-normal text-slate-400">· Zone B</span></td>
+              <td class="py-3 px-5 text-slate-600">Known anomaly detected. CNN confidence 88%. Monitoring agent issued RED ALERT.</td>
+              <td class="py-3 px-5 text-right font-mono text-xs text-rose-600">Unacknowledged</td>
+            </tr>
+            <tr class="hover:bg-slate-50/50 transition-colors">
+              <td class="py-3 px-5 font-mono text-xs text-slate-400">10:15 AM</td>
+              <td class="py-3 px-5 font-medium text-slate-800">Pump 00 <span class="text-xs font-normal text-slate-400">· Zone A</span></td>
+              <td class="py-3 px-5 text-slate-600">Model regression test passed. Avg Forgetting: 3.55% (RESONA Replay).</td>
+              <td class="py-3 px-5 text-right font-mono text-xs text-slate-400">Verified</td>
+            </tr>
+            <tr class="hover:bg-slate-50/50 transition-colors">
+              <td class="py-3 px-5 font-mono text-xs text-slate-400">09:30 AM</td>
+              <td class="py-3 px-5 font-medium text-slate-800">Pump 04 <span class="text-xs font-normal text-slate-400">· Zone D</span></td>
+              <td class="py-3 px-5 text-slate-600">Continual learning: Task 3 trained. Replay buffer injected 377 Task 1+2 samples.</td>
+              <td class="py-3 px-5 text-right font-mono text-xs text-slate-400">Learned</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 
-            document.getElementById('confidence').innerText = (state.confidence * 100).toFixed(2) + '%';
-            document.getElementById('unknown-score').innerText = state.unknown_score.toFixed(2);
-            document.getElementById('agent-action').innerText = state.last_alert || 'LOG_ONLY';
+  <!-- ======= REVIEW QUEUE TAB ======= -->
+  <div id="tab-content-review" class="hidden">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-5 border-b border-slate-200/60 mb-8">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-xs font-mono font-semibold uppercase">ACTION REQ-08812</span>
+          <h1 class="text-2xl font-light text-slate-900 tracking-tight">Human Review Queue</h1>
+        </div>
+        <p class="text-slate-500 text-sm mt-1">Conditions requiring operator verification for human-in-the-loop validation</p>
+      </div>
+      <div class="flex items-center gap-3 text-xs font-mono">
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700">
+          <span class="w-2 h-2 rounded-full bg-amber-600 pulse-dot"></span>
+          <span>1 PENDING VERIFICATION</span>
+        </div>
+      </div>
+    </div>
 
-            const hrPanel = document.getElementById('human-review-panel');
-            if (state.is_unknown) {
-                hrPanel.style.display = 'block';
-            } else {
-                hrPanel.style.display = 'none';
-            }
-        }
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+      <!-- Left: Verification Form -->
+      <div class="xl:col-span-7 flex flex-col gap-6">
+        <!-- Queue Table -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+          <div class="px-5 py-3 bg-slate-50 flex items-center justify-between border-b border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px] text-[#0f4c81]">pending_actions</span>
+              <span class="text-sm font-semibold text-slate-900">Pending Verification Queue</span>
+            </div>
+            <span class="text-xs font-mono text-slate-400">QUEUE DEPTH: 2 ITEMS</span>
+          </div>
+          <table class="w-full text-left text-sm">
+            <thead><tr class="bg-slate-50 text-xs font-mono text-slate-400 uppercase border-b border-slate-100">
+              <th class="px-5 py-2.5 font-semibold">Asset</th>
+              <th class="px-5 py-2.5 font-semibold">Location</th>
+              <th class="px-5 py-2.5 font-semibold">Detected</th>
+              <th class="px-5 py-2.5 font-semibold">State</th>
+              <th class="px-5 py-2.5 font-semibold text-right">Action</th>
+            </tr></thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr class="bg-amber-50/50 hover:bg-amber-50 transition-colors">
+                <td class="px-5 py-3"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-600"></span><span class="font-medium text-slate-900">Fan 02</span></div></td>
+                <td class="px-5 py-3 text-slate-700">Zone C</td>
+                <td class="px-5 py-3 font-mono text-xs text-slate-700">10:51 AM</td>
+                <td class="px-5 py-3"><span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-mono font-semibold uppercase"><span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span>Awaiting Verification</span></td>
+                <td class="px-5 py-3 text-right"><span class="inline-flex items-center px-2 py-1 rounded bg-[#0f4c81] text-white text-xs font-mono font-semibold uppercase">Selected</span></td>
+              </tr>
+              <tr class="hover:bg-slate-50 transition-colors opacity-70">
+                <td class="px-5 py-3"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-400"></span><span class="font-medium text-slate-900">Motor 05</span></div></td>
+                <td class="px-5 py-3 text-slate-500">Zone A</td>
+                <td class="px-5 py-3 font-mono text-xs text-slate-500">08:30 AM</td>
+                <td class="px-5 py-3"><span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-xs font-mono font-medium uppercase"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>Resolved / Learned</span></td>
+                <td class="px-5 py-3 text-right"><button class="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs font-mono uppercase hover:bg-slate-200 transition-colors">View Log</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-        async function runTestCase(caseId) {
-            const res = await fetch(`${API_URL}/simulate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ test_case: caseId })
-            });
-            const data = await res.json();
-            updateDashboard(data.state, data.event);
-        }
+        <!-- Verification Form -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6 flex flex-col gap-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-semibold text-slate-900 text-lg">FAN 02 — Exhaust Blower</span>
+                <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-xs font-mono">ID: BLW-EX-02</span>
+              </div>
+              <p class="text-slate-500 text-xs mt-0.5">Location: Zone C (Cooling Bay) · Primary Induction Drive 45kW</p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-100 text-amber-900 text-xs font-mono font-semibold uppercase">
+              <span class="w-2 h-2 rounded-full bg-amber-600 pulse-dot"></span>
+              Unfamiliar Acoustic Condition
+            </span>
+          </div>
+          <div class="p-4 rounded-lg bg-blue-50 flex items-start gap-3">
+            <span class="material-symbols-outlined text-[#0f4c81] text-[20px] shrink-0 mt-0.5">info</span>
+            <div>
+              <span class="text-sm font-semibold text-[#0f4c81]">AI Perception Advisory</span>
+              <p class="text-sm text-slate-700 mt-0.5">The system encountered an unfamiliar acoustic pattern (OOD score: 95.6) that does not match known operating baselines. Human verification is requested to update the model's Continual Learning replay buffer.</p>
+            </div>
+          </div>
 
-        async function submitFeedback(label) {
-            const res = await fetch(`${API_URL}/human_feedback`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ label: label })
-            });
-            const data = await res.json();
-            alert(data.message);
-            // reset UI
-            document.getElementById('human-review-panel').style.display = 'none';
-            document.getElementById('status-badge').innerText = "🔄 LEARNING NEW CONDITION...";
-        }
+          <form id="verificationForm" onsubmit="event.preventDefault(); handleVerificationSubmit();" class="flex flex-col gap-5">
+            <div class="flex flex-col gap-3">
+              <label class="text-sm font-semibold text-slate-900 flex items-center justify-between">
+                <span>What best describes the current machine condition?</span>
+                <span class="text-xs font-mono text-rose-600 font-normal">* Mandatory</span>
+              </label>
+              <div class="grid grid-cols-1 gap-2">
+                <label class="relative flex items-start gap-4 p-4 rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200">
+                  <input class="mt-1 w-4 h-4 accent-emerald-600" name="machineCondition" required type="radio" value="normal"/>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-semibold text-slate-900">NORMAL OPERATION</span>
+                      <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-mono font-semibold uppercase">Nominal</span>
+                    </div>
+                    <span class="text-xs text-slate-500">Machine operates correctly — acoustic variation is acceptable operating sound.</span>
+                  </div>
+                </label>
+                <label class="relative flex items-start gap-4 p-4 rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200">
+                  <input class="mt-1 w-4 h-4 accent-rose-600" name="machineCondition" type="radio" value="anomalous"/>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-semibold text-rose-700">ANOMALOUS — FAULT DETECTED</span>
+                      <span class="px-1.5 py-0.5 rounded bg-red-100 text-rose-700 text-xs font-mono font-semibold uppercase">Alert L2</span>
+                    </div>
+                    <span class="text-xs text-slate-500">Machine exhibits abnormal acoustic fault (bearing friction, cavitation, etc).</span>
+                  </div>
+                </label>
+                <label class="relative flex items-start gap-4 p-4 rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all border border-transparent hover:border-slate-200">
+                  <input class="mt-1 w-4 h-4 accent-blue-600" name="machineCondition" type="radio" value="new_condition"/>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-semibold text-slate-900">NEW / UNRECOGNIZED CONDITION</span>
+                      <span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-mono font-semibold uppercase">Learn Pattern</span>
+                    </div>
+                    <span class="text-xs text-slate-500">Valid new operational state — Continual Learning replay buffer will incorporate.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
 
-        async function fetchResults() {
-            const res = await fetch(`${API_URL}/results`);
-            const data = await res.json();
-            document.getElementById('results-display').innerText = data.data;
-        }
-        
-        // Init
-        runTestCase(1);
-    </script>
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center justify-between">
+                <label class="text-sm font-semibold text-slate-900" for="operatorNotes">Operator Observation Notes</label>
+                <span class="text-xs font-mono text-slate-400">OPTIONAL</span>
+              </div>
+              <textarea class="w-full p-3 rounded-lg bg-slate-50 text-slate-800 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0f4c81] transition-all resize-none border border-slate-200" id="operatorNotes" placeholder="e.g., Routine bearing grease cycle performed at 10:45 AM..." rows="3"></textarea>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+              <button class="w-full sm:w-auto px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold flex items-center justify-center gap-2 transition-colors" onclick="assignFieldTechnician()" type="button">
+                <span class="material-symbols-outlined text-[18px]">engineering</span>
+                <span>Assign Field Technician</span>
+              </button>
+              <div class="flex items-center gap-2 w-full sm:w-auto">
+                <button class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm transition-colors" type="reset">Clear</button>
+                <button class="flex-1 sm:flex-initial px-5 py-2 rounded-lg bg-[#0f4c81] hover:bg-[#0a3357] text-white text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition-all" type="submit">
+                  <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                  <span>SUBMIT VERIFICATION</span>
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <div class="hidden p-3 rounded-lg bg-emerald-100 text-emerald-900 text-sm flex items-center gap-2" id="confirmationToast">
+            <span class="material-symbols-outlined text-emerald-700">task_alt</span>
+            <span>Verification recorded. Dispatching token to Continual Learning replay buffer.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: QR + Pipeline -->
+      <div class="xl:col-span-5 flex flex-col gap-5">
+        <!-- QR Panel -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-[#0f4c81] text-[20px]">qr_code_scanner</span>
+              <h2 class="font-semibold text-slate-900">MOBILE VERIFICATION</h2>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-xs font-mono">SCAN TO REVIEW</span>
+          </div>
+          <p class="text-sm text-slate-600">Connect floor operator directly to this machine review on a handheld device. Scan QR to open the mobile HMI.</p>
+          <div class="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-lg bg-slate-50">
+            <div id="qr-placeholder" class="p-2 bg-white rounded-lg shadow-sm shrink-0">
+              <svg class="w-32 h-32 text-slate-900" fill="currentColor" viewBox="0 0 100 100">
+                <rect height="30" width="30" x="0" y="0"></rect><rect fill="#fff" height="20" width="20" x="5" y="5"></rect><rect height="10" width="10" x="10" y="10"></rect>
+                <rect height="30" width="30" x="70" y="0"></rect><rect fill="#fff" height="20" width="20" x="75" y="5"></rect><rect height="10" width="10" x="80" y="10"></rect>
+                <rect height="30" width="30" x="0" y="70"></rect><rect fill="#fff" height="20" width="20" x="5" y="75"></rect><rect height="10" width="10" x="10" y="80"></rect>
+                <rect height="8" width="8" x="36" y="8"></rect><rect height="8" width="16" x="48" y="8"></rect><rect height="8" width="16" x="36" y="20"></rect>
+                <rect height="8" width="8" x="56" y="20"></rect><rect height="16" width="8" x="8" y="36"></rect><rect height="8" width="8" x="20" y="44"></rect>
+                <rect height="8" width="16" x="8" y="56"></rect><rect height="28" width="28" x="36" y="36"></rect><rect fill="#fff" height="16" width="16" x="42" y="42"></rect>
+                <rect height="4" width="4" x="48" y="48"></rect><rect height="10" width="10" x="70" y="36"></rect><rect height="18" width="8" x="84" y="36"></rect>
+                <rect height="6" width="18" x="74" y="50"></rect><rect height="8" width="12" x="36" y="72"></rect><rect height="18" width="8" x="52" y="72"></rect>
+                <rect height="8" width="12" x="36" y="84"></rect><rect height="10" width="10" x="64" y="72"></rect><rect height="6" width="14" x="78" y="68"></rect>
+                <rect height="8" width="24" x="68" y="86"></rect>
+              </svg>
+            </div>
+            <div class="flex flex-col gap-1 text-left">
+              <span class="text-xs font-mono text-slate-400">DISPATCH URL:</span>
+              <span class="text-xs font-mono text-[#0f4c81] font-semibold select-all break-all" id="qr-url">resona.plant.internal/review/fan02-req8812</span>
+              <div class="flex items-center gap-1.5 mt-1 text-xs font-mono text-slate-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span>Direct Access Token Active (15m)</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <span class="text-xs font-mono text-slate-400 uppercase font-semibold">Standard Verification Protocol</span>
+            <ol class="space-y-1.5 text-xs text-slate-600">
+              <li class="flex items-start gap-1.5"><span class="font-mono font-semibold text-[#0f4c81]">1.</span><span>Open authorized mobile device on plant Wi-Fi and scan QR.</span></li>
+              <li class="flex items-start gap-1.5"><span class="font-mono font-semibold text-[#0f4c81]">2.</span><span>Physically inspect Fan 02 in Zone C (bearing temp, air duct pressure, vibration).</span></li>
+              <li class="flex items-start gap-1.5"><span class="font-mono font-semibold text-[#0f4c81]">3.</span><span>Submit condition verification from the floor terminal.</span></li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- Mobile Simulator -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono text-slate-400 uppercase font-semibold">Floor Operator View (Simulated Mobile)</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-mono">LIVE PREVIEW</span>
+          </div>
+          <div class="mx-auto w-full max-w-[300px] rounded-xl bg-slate-100 p-2 shadow-inner">
+            <div class="w-full bg-white rounded-lg p-4 flex flex-col gap-3 shadow-sm">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-sm font-bold text-[#0f4c81]">RESONA</span>
+                  <span class="text-xs font-mono text-slate-400">Mobile HMI</span>
+                </div>
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              </div>
+              <div>
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold text-slate-900">Fan 02</span>
+                  <span class="text-xs font-mono text-slate-400">Zone C</span>
+                </div>
+                <span class="text-xs text-amber-700 font-medium">Unfamiliar acoustic condition detected</span>
+              </div>
+              <div class="grid grid-cols-3 gap-1.5">
+                <button onclick="simulateMobileClick('NORMAL')" class="py-1.5 px-1 rounded bg-slate-100 hover:bg-emerald-100 text-slate-700 text-xs font-mono font-semibold transition-colors text-center">NORMAL</button>
+                <button onclick="simulateMobileClick('ANOMALOUS')" class="py-1.5 px-1 rounded bg-slate-100 hover:bg-red-100 text-rose-600 text-xs font-mono font-semibold transition-colors text-center">ANOMALY</button>
+                <button onclick="simulateMobileClick('NEW STATE')" class="py-1.5 px-1 rounded bg-slate-100 hover:bg-blue-100 text-blue-700 text-xs font-mono font-semibold transition-colors text-center">NEW COND</button>
+              </div>
+              <button onclick="simulateMobileSubmit()" class="w-full py-2 rounded bg-[#0f4c81] text-white text-xs font-mono font-semibold uppercase">SUBMIT FROM FLOOR</button>
+              <div class="hidden text-center text-xs font-mono text-emerald-800 font-semibold pt-1" id="mobileFeedback">✓ Dispatched from Terminal #T-09</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CL Pipeline -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono text-slate-400 uppercase font-semibold">Continual Learning Telemetry Pipeline</span>
+            <span class="text-xs font-mono text-[#0f4c81] font-medium">PIPELINE NOMINAL</span>
+          </div>
+          <div class="flex items-center justify-between text-xs font-mono text-slate-700">
+            <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Human Verification</span>
+            <span class="material-symbols-outlined text-[14px] text-slate-400">arrow_forward</span>
+            <span>Review Agent</span>
+            <span class="material-symbols-outlined text-[14px] text-slate-400">arrow_forward</span>
+            <span>Replay Buffer</span>
+            <span class="material-symbols-outlined text-[14px] text-slate-400">arrow_forward</span>
+            <span class="font-semibold text-[#0f4c81]">Model Update</span>
+          </div>
+          <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-[#0f4c81] h-full w-3/4 rounded-full transition-all duration-1000" id="pipeline-progress"></div>
+          </div>
+          <p class="text-xs text-slate-500">Operator action commits labeled embeddings into local edge replay cache for nightly retraining.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= LIVE DEMO TAB ======= -->
+  <div id="tab-content-demo" class="hidden">
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 pb-5 border-b border-slate-200/60 gap-4">
+      <div>
+        <h1 class="text-2xl font-light text-slate-900 tracking-tight">Live Inference Demo</h1>
+        <p class="text-slate-500 text-sm mt-1">Simulate machine conditions or upload a real .wav file for live AI classification</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <!-- Left: Controls -->
+      <div class="lg:col-span-5 flex flex-col gap-5">
+        <!-- Demo Scenario Buttons -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-4">
+          <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Narrative Demo Scenarios</h2>
+          <div class="grid grid-cols-1 gap-2">
+            <button onclick="runTestCase(1)" class="demo-btn text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-[#0f4c81] hover:bg-blue-50 transition-all">
+              <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-sm font-semibold text-slate-900">1. Normal Pump Operation</span></div>
+              <span class="text-xs text-slate-500 font-mono">Pump 00 · Zone A · Healthy baseline</span>
+            </button>
+            <button onclick="runTestCase(2)" class="demo-btn text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-rose-400 hover:bg-red-50 transition-all">
+              <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-rose-500"></span><span class="text-sm font-semibold text-slate-900">2. Known Anomaly (Bearing Wear)</span></div>
+              <span class="text-xs text-slate-500 font-mono">Pump 02 · Zone B · CNN confidence 88%</span>
+            </button>
+            <button onclick="runTestCase(3)" class="demo-btn text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all">
+              <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span class="text-sm font-semibold text-slate-900">3. Normal w/ Factory Noise (0dB SNR)</span></div>
+              <span class="text-xs text-slate-500 font-mono">Noise-robust classification · 85% confidence</span>
+            </button>
+            <button onclick="runTestCase(4)" class="demo-btn text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-red-50 transition-all">
+              <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-rose-400"></span><span class="text-sm font-semibold text-slate-900">4. Noisy Anomaly Signal</span></div>
+              <span class="text-xs text-slate-500 font-mono">High noise environment · 79% confidence</span>
+            </button>
+            <button onclick="runTestCase(5)" class="demo-btn text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition-all">
+              <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-500"></span><span class="text-sm font-semibold text-slate-900">5. Unknown Condition — OOD Detected</span></div>
+              <span class="text-xs text-slate-500 font-mono">Mahalanobis score: 95.6 · Human loop triggered</span>
+            </button>
+            <button onclick="runTestCase(6)" class="demo-btn text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition-all">
+              <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-500"></span><span class="text-sm font-semibold text-slate-900">6. Trigger Human Verification</span></div>
+              <span class="text-xs text-slate-500 font-mono">Monitoring Agent → Human Review Agent</span>
+            </button>
+            <button onclick="runTestCase(7)" class="demo-btn text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all">
+              <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span><span class="text-sm font-semibold text-slate-900">7. Post-Learning Recognition</span></div>
+              <span class="text-xs text-slate-500 font-mono">Learning Agent updated model · Now classifies!</span>
+            </button>
+            <button onclick="runTestCase(8)" class="demo-btn text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition-all">
+              <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-purple-500"></span><span class="text-sm font-semibold text-slate-900">8. Forgetting Evaluation (Regression Test)</span></div>
+              <span class="text-xs text-slate-500 font-mono">RESONA Replay: 3.55% · Naive: 86.80%</span>
+            </button>
+            <button onclick="loadResults()" class="demo-btn text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-[#0f4c81] hover:bg-blue-50 transition-all">
+              <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-[#0f4c81]"></span><span class="text-sm font-semibold text-slate-900">9. Load Evaluation Metrics</span></div>
+              <span class="text-xs text-slate-500 font-mono">Read from results/results_RESONA_Replay.txt</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Upload -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-3">
+          <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Live WAV Upload</h2>
+          <p class="text-xs text-slate-500">Upload a real .wav file from your MIMII dataset folder for live ResNet18 inference.</p>
+          <label class="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-6 cursor-pointer hover:border-[#0f4c81] hover:bg-blue-50 transition-all" for="wavUpload">
+            <span class="material-symbols-outlined text-slate-400 text-4xl mb-2">upload_file</span>
+            <span class="text-sm text-slate-600 font-medium">Drop .wav file or click to browse</span>
+            <span class="text-xs text-slate-400 font-mono mt-1">data/raw/pump/id_00/normal/*.wav</span>
+          </label>
+          <input type="file" id="wavUpload" accept=".wav" class="hidden" onchange="uploadAudio()"/>
+          <div id="upload-status" class="hidden text-xs font-mono text-slate-500 text-center"></div>
+        </div>
+      </div>
+
+      <!-- Right: Results Panel -->
+      <div class="lg:col-span-7 flex flex-col gap-5">
+        <!-- Status Card -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">AI Prediction Output</h2>
+            <span id="result-badge" class="px-3 py-1 rounded-full text-xs font-mono font-semibold uppercase status-normal">Nominal</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+            <div class="flex flex-col gap-1 p-3 rounded-lg bg-slate-50">
+              <span class="text-xs font-mono text-slate-400 uppercase">Status</span>
+              <span class="text-base font-semibold text-slate-900" id="result-status">NORMAL</span>
+            </div>
+            <div class="flex flex-col gap-1 p-3 rounded-lg bg-slate-50">
+              <span class="text-xs font-mono text-slate-400 uppercase">Confidence</span>
+              <span class="text-base font-semibold text-slate-900" id="result-confidence">—</span>
+            </div>
+            <div class="flex flex-col gap-1 p-3 rounded-lg bg-slate-50">
+              <span class="text-xs font-mono text-slate-400 uppercase">OOD Score</span>
+              <span class="text-base font-semibold text-slate-900" id="result-ood">—</span>
+            </div>
+            <div class="flex flex-col gap-1 p-3 rounded-lg bg-slate-50">
+              <span class="text-xs font-mono text-slate-400 uppercase">Decision</span>
+              <span class="text-base font-semibold text-slate-900" id="result-decision">—</span>
+            </div>
+          </div>
+
+          <!-- Alert area -->
+          <div id="alert-banner" class="hidden p-3 rounded-lg text-sm flex items-center gap-2">
+            <span class="material-symbols-outlined text-[20px]" id="alert-icon">info</span>
+            <span id="alert-text"></span>
+          </div>
+        </div>
+
+        <!-- Spectrogram Visualization -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Log-Mel Spectrogram</h2>
+            <span class="text-xs font-mono text-slate-400" id="spectrogram-label">Awaiting signal...</span>
+          </div>
+          <canvas id="spectrogram-canvas" width="600" height="200" class="w-full rounded-lg"></canvas>
+          <p class="text-xs text-slate-400 font-mono">64 Mel filterbanks · 10s window · 16kHz sample rate · STFT hop: 512</p>
+        </div>
+
+        <!-- Results Text -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Evaluation Results</h2>
+            <button onclick="loadResults()" class="text-xs font-mono text-[#0f4c81] hover:underline">Load from file</button>
+          </div>
+          <pre id="results-output" class="text-xs font-mono text-slate-600 bg-slate-50 p-4 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap">Click "9. Load Evaluation Metrics" or the "Load from file" button to read your trained results...</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= METRICS TAB ======= -->
+  <div id="tab-content-metrics" class="hidden">
+    <div class="mb-8 pb-5 border-b border-slate-200/60">
+      <h1 class="text-2xl font-light text-slate-900 tracking-tight">Continual Learning Evaluation</h1>
+      <p class="text-slate-500 text-sm mt-1">Mathematical proof that RESONA solves Catastrophic Forgetting on the MIMII dataset</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+      <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+        <span class="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-3">RESONA Replay — Avg Forgetting</span>
+        <div class="text-4xl font-light text-emerald-600">3.55%</div>
+        <p class="text-xs text-slate-400 mt-2">Near-zero memory loss across 3 continual tasks</p>
+      </div>
+      <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+        <span class="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-3">Naive Fine-Tuning — Avg Forgetting</span>
+        <div class="text-4xl font-light text-rose-600">86.80%</div>
+        <p class="text-xs text-slate-400 mt-2">Catastrophic forgetting without replay memory</p>
+      </div>
+      <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+        <span class="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-3">RESONA Replay — Final Accuracy</span>
+        <div class="text-4xl font-light text-[#0f4c81]">94.59%</div>
+        <p class="text-xs text-slate-400 mt-2">Average across all 3 pump machines</p>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6 mb-6">
+      <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Accuracy Regression Matrix — RESONA Replay</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left font-mono">
+          <thead><tr class="text-xs text-slate-400 border-b border-slate-100">
+            <th class="py-2 pr-6 font-normal">Task Evaluated →</th>
+            <th class="py-2 px-4 font-normal text-center">After Task 1</th>
+            <th class="py-2 px-4 font-normal text-center">After Task 2</th>
+            <th class="py-2 px-4 font-normal text-center">After Task 3</th>
+          </tr></thead>
+          <tbody class="divide-y divide-slate-50">
+            <tr><td class="py-3 pr-6 font-semibold text-slate-800">Task 1 (Pump 00)</td><td class="py-3 px-4 text-center text-emerald-700 font-semibold">97.68%</td><td class="py-3 px-4 text-center text-emerald-600">96.81%</td><td class="py-3 px-4 text-center text-emerald-600">95.94%</td></tr>
+            <tr><td class="py-3 pr-6 font-semibold text-slate-800">Task 2 (Pump 02)</td><td class="py-3 px-4 text-center text-slate-400">—</td><td class="py-3 px-4 text-center text-emerald-700 font-semibold">99.40%</td><td class="py-3 px-4 text-center text-emerald-600">94.05%</td></tr>
+            <tr><td class="py-3 pr-6 font-semibold text-slate-800">Task 3 (Pump 04)</td><td class="py-3 px-4 text-center text-slate-400">—</td><td class="py-3 px-4 text-center text-slate-400">—</td><td class="py-3 px-4 text-center text-emerald-700 font-semibold">93.78%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+      <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">All Methods Comparison</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead><tr class="text-xs font-mono text-slate-400 border-b border-slate-100">
+            <th class="py-2 pr-6 font-normal">Method</th>
+            <th class="py-2 px-4 font-normal text-center">Avg Final Accuracy</th>
+            <th class="py-2 px-4 font-normal text-center">Avg Forgetting</th>
+            <th class="py-2 px-4 font-normal text-center">Verdict</th>
+          </tr></thead>
+          <tbody class="divide-y divide-slate-50 text-sm">
+            <tr class="bg-emerald-50/50">
+              <td class="py-3 pr-6 font-semibold text-slate-900">RESONA Replay <span class="text-xs font-mono text-[#0f4c81] font-normal">(Our Method)</span></td>
+              <td class="py-3 px-4 text-center font-mono font-semibold text-emerald-700">94.59%</td>
+              <td class="py-3 px-4 text-center font-mono font-semibold text-emerald-700">3.55%</td>
+              <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-mono font-semibold">✓ WINNER</span></td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 text-slate-700">Joint Training (Upper Bound)</td>
+              <td class="py-3 px-4 text-center font-mono text-slate-700">98.71%</td>
+              <td class="py-3 px-4 text-center font-mono text-slate-700">-5.48%</td>
+              <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-xs font-mono">Cheat Code</span></td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 text-slate-700">RESONA NoReplay (Ablation)</td>
+              <td class="py-3 px-4 text-center font-mono text-slate-700">40.35%</td>
+              <td class="py-3 px-4 text-center font-mono text-rose-600">72.22%</td>
+              <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 rounded bg-red-100 text-rose-700 text-xs font-mono">Buffer Critical</span></td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-6 text-slate-700">Naive Fine-Tuning (Baseline)</td>
+              <td class="py-3 px-4 text-center font-mono text-rose-600">40.55%</td>
+              <td class="py-3 px-4 text-center font-mono text-rose-600">86.80%</td>
+              <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 rounded bg-red-100 text-rose-700 text-xs font-mono">Catastrophic</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="border-t border-slate-100 bg-white py-4 mt-auto">
+  <div class="max-w-7xl mx-auto px-8 flex flex-col sm:flex-row items-center justify-between text-xs font-mono text-slate-400 gap-3">
+    <div>RESONA Acoustic System · Plant-Nord-04 · SimpleCNN + Continual Learning</div>
+    <div class="flex items-center space-x-5">
+      <span>Sampling: 16 kHz</span>
+      <span>Mel Bins: 64</span>
+      <span>Dataset: MIMII 0dB</span>
+      <span>Latency: ~14ms</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const API_BASE = 'http://127.0.0.1:5000/api';
+
+  // Live clock
+  setInterval(() => {
+    document.getElementById('live-clock').textContent = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) + ' UTC';
+  }, 1000);
+
+  // Tab navigation
+  function showTab(tabName) {
+    ['overview','review','demo','metrics'].forEach(t => {
+      document.getElementById('tab-content-' + t).classList.add('hidden');
+      document.getElementById('tab-' + t).classList.remove('active', 'border-slate-900', 'text-slate-900', 'font-semibold');
+      document.getElementById('tab-' + t).classList.add('text-slate-500', 'border-transparent');
+    });
+    document.getElementById('tab-content-' + tabName).classList.remove('hidden');
+    const btn = document.getElementById('tab-' + tabName);
+    btn.classList.add('active', 'border-slate-900', 'text-slate-900', 'font-semibold');
+    btn.classList.remove('text-slate-500', 'border-transparent');
+  }
+
+  // Refresh
+  function refreshTelemetry() {
+    const icon = document.getElementById('refresh-icon');
+    icon.style.transform = 'rotate(360deg)';
+    icon.style.transition = 'transform 0.5s';
+    setTimeout(() => { icon.style.transform = ''; icon.style.transition = ''; }, 600);
+  }
+
+  // Acknowledge
+  function handleAcknowledge(btn) {
+    btn.textContent = 'Acknowledged';
+    btn.disabled = true;
+    btn.classList.add('opacity-40', 'cursor-not-allowed');
+  }
+
+  // Test case runner
+  async function runTestCase(tc) {
+    showTab('demo');
+    try {
+      const res = await fetch(`${API_BASE}/simulate`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({test_case: tc})
+      });
+      const data = await res.json();
+      if (data.success) updateResultsUI(data.state, data.event);
+    } catch (e) {
+      document.getElementById('result-status').textContent = 'Backend offline';
+    }
+  }
+
+  function updateResultsUI(state, event) {
+    document.getElementById('result-status').textContent = state.status;
+    document.getElementById('result-confidence').textContent = state.confidence ? (state.confidence * 100).toFixed(1) + '%' : '—';
+    document.getElementById('result-ood').textContent = state.unknown_score ? state.unknown_score.toFixed(1) : '—';
+    document.getElementById('result-decision').textContent = event ? event.decision : state.last_alert || '—';
+
+    const badge = document.getElementById('result-badge');
+    const banner = document.getElementById('alert-banner');
+    badge.className = 'px-3 py-1 rounded-full text-xs font-mono font-semibold uppercase';
+    banner.className = 'p-3 rounded-lg text-sm flex items-center gap-2';
+
+    if (state.is_unknown) {
+      badge.classList.add('status-unknown');
+      banner.classList.add('bg-amber-50', 'text-amber-900');
+      banner.classList.remove('hidden');
+      document.getElementById('alert-icon').textContent = 'warning';
+      document.getElementById('alert-text').textContent = '⚠ Unknown Condition Flagged — Mahalanobis OOD score: ' + state.unknown_score?.toFixed(1) + '. Human Review Agent triggered. Check Review Queue.';
+    } else if (state.prediction === 1) {
+      badge.classList.add('status-anomaly');
+      banner.classList.add('bg-red-50', 'text-rose-900');
+      banner.classList.remove('hidden');
+      document.getElementById('alert-icon').textContent = 'error';
+      document.getElementById('alert-text').textContent = '🔴 Known Anomaly Detected — Monitoring Agent issued ALERT. Maintenance required.';
+    } else if (state.prediction === 2) {
+      badge.classList.add('status-new');
+      banner.classList.add('bg-blue-50', 'text-blue-900');
+      banner.classList.remove('hidden');
+      document.getElementById('alert-icon').textContent = 'school';
+      document.getElementById('alert-text').textContent = '🔵 New Condition Recognized — Learning Agent successfully updated model.';
+    } else {
+      badge.classList.add('status-normal');
+      banner.classList.add('hidden');
+    }
+
+    drawSpectrogram(state.status);
+    document.getElementById('spectrogram-label').textContent = 'Pump 00 · MIMII 0dB · Real-time simulation';
+  }
+
+  // Draw pseudo spectrogram
+  function drawSpectrogram(status) {
+    const canvas = document.getElementById('spectrogram-canvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x++) {
+      for (let y = 0; y < h; y++) {
+        const freq = 1 - y / h;
+        let intensity = Math.random() * 0.15;
+        // Add harmonic patterns
+        if (Math.abs(Math.sin(x * 0.05 + freq * Math.PI * 3)) > 0.7) intensity += 0.4;
+        if (status === 'KNOWN ANOMALY' && freq > 0.6) intensity += Math.random() * 0.5;
+        if (status === 'UNKNOWN CONDITION') intensity += Math.random() > 0.95 ? 0.8 : 0;
+        intensity = Math.min(1, intensity);
+        const r = Math.floor(intensity * 220), g = Math.floor(intensity * 80), b = Math.floor((1 - intensity) * 180 + 40);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+
+  // Load results
+  async function loadResults() {
+    showTab('demo');
+    try {
+      const res = await fetch(`${API_BASE}/results`);
+      const data = await res.json();
+      document.getElementById('results-output').textContent = data.data || 'No results file found.';
+    } catch (e) {
+      document.getElementById('results-output').textContent = 'Backend offline. Run: python app/backend/api.py';
+    }
+  }
+
+  // Upload audio
+  async function uploadAudio() {
+    const fileInput = document.getElementById('wavUpload');
+    const statusEl = document.getElementById('upload-status');
+    if (!fileInput.files.length) return;
+
+    showTab('demo');
+    statusEl.classList.remove('hidden');
+    statusEl.textContent = '⏳ Processing audio through SimpleCNN...';
+
+    const formData = new FormData();
+    formData.append('audio', fileInput.files[0]);
+
+    try {
+      const res = await fetch(`${API_BASE}/upload_audio`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.success) {
+        updateResultsUI(data.state, data.event);
+        statusEl.textContent = '✓ Processed: ' + fileInput.files[0].name;
+      } else {
+        statusEl.textContent = '✗ Error: ' + data.message;
+      }
+    } catch (e) {
+      statusEl.textContent = '✗ Backend offline. Start api.py first.';
+    }
+  }
+
+  // Review form submission
+  async function handleVerificationSubmit() {
+    const selected = document.querySelector('input[name="machineCondition"]:checked');
+    if (!selected) return;
+
+    const labelMap = { normal: 'NORMAL', anomalous: 'KNOWN ANOMALY', new_condition: 'NEW CONDITION' };
+    try {
+      await fetch(`${API_BASE}/human_feedback`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ label: labelMap[selected.value] })
+      });
+    } catch (e) {}
+
+    const toast = document.getElementById('confirmationToast');
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 5000);
+    document.getElementById('pipeline-progress').style.width = '100%';
+    setTimeout(() => document.getElementById('pipeline-progress').style.width = '75%', 2000);
+  }
+
+  function assignFieldTechnician() {
+    alert('Field dispatch alert sent to Zone C on-duty technician via Plant Radio & Work Order System.');
+  }
+
+  function simulateMobileClick(type) {
+    const map = { 'NORMAL': 'normal', 'ANOMALOUS': 'anomalous', 'NEW STATE': 'new_condition' };
+    const radio = document.querySelector(`input[name="machineCondition"][value="${map[type]}"]`);
+    if (radio) radio.checked = true;
+  }
+
+  function simulateMobileSubmit() {
+    const feedback = document.getElementById('mobileFeedback');
+    feedback.classList.remove('hidden');
+    setTimeout(() => feedback.classList.add('hidden'), 3500);
+    handleVerificationSubmit();
+  }
+
+  // Init spectrogram
+  drawSpectrogram('NORMAL');
+</script>
 </body>
 </html>

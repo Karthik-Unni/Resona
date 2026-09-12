@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESONA Mobile Alert</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --primary: #3b82f6;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .alert-box {
+            background: var(--surface);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 50px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border-top: 5px solid var(--warning);
+        }
+        h1 {
+            color: var(--warning);
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+        }
+        .btn-normal { background: var(--success); }
+        .btn-known { background: var(--danger); }
+        .btn-new { background: var(--warning); }
+    </style>
+</head>
+<body>
+    <div class="alert-box">
+        <h1>⚠️ Unfamiliar Machine Condition Detected</h1>
+        <h2>Machine: <span id="machine-id">Pump-00</span></h2>
+        <p>The system has detected a sound outside its known distribution. Please review the machine state.</p>
+        
+        <h3>Provide Feedback:</h3>
+        <button class="btn-normal" onclick="sendFeedback('NORMAL')">It is NORMAL</button>
+        <button class="btn-known" onclick="sendFeedback('KNOWN ANOMALY')">It is a KNOWN ANOMALY</button>
+        <button class="btn-new" onclick="sendFeedback('NEW CONDITION')">It is a NEW CONDITION</button>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        
+        // In a real scenario, machine-id would come from URL params
+        const urlParams = new URLSearchParams(window.location.search);
+        const machine = urlParams.get('machine') || 'Pump-00';
+        document.getElementById('machine-id').innerText = machine;
+
+        async function sendFeedback(label) {
+            try {
+                const res = await fetch(`${API_URL}/human_feedback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ label: label, machine: machine })
+                });
+                const data = await res.json();
+                alert(data.message);
+                document.body.innerHTML = '<h2>Thank you. Feedback submitted successfully.</h2><p>You can close this page.</p>';
+            } catch (err) {
+                alert("Error connecting to the backend API.");
+            }
+        }
+    </script>
+</body>
+</html>

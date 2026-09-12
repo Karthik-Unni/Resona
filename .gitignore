@@ -1,29 +1,31 @@
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Data and Models
-data/raw/*
-!data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
-results/models/*
-!results/models/.gitkeep
+# Data files (too large for git)
+data/raw/
+data/processed/
 *.zip
+*.wav
 *.npy
-*.pth
 
-# IDEs
-.vscode/
-.idea/
+# Model weights (too large)
+results/models/*.pth
+
+# Node / Expo
+node_modules/
+app/mobile/node_modules/
+.expo/
+app/mobile/.expo/
+*.lock
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log

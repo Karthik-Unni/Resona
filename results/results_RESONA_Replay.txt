@@ -1,0 +1,7 @@
+Method: RESONA_Replay
+Average Final Accuracy: 94.59%
+Average Forgetting: 3.55%
+Accuracy Matrix:
+[[97.68 96.81 95.94]
+ [ 0.   99.4  94.05]
+ [ 0.    0.   93.78]]

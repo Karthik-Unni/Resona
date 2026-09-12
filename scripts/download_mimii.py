@@ -22,6 +22,9 @@ def download_file(url, target_path):
                 sys.stdout.write(f"\rDownloaded {downloaded / (1024*1024):.2f} MB ({percent}%)")
                 sys.stdout.flush()
 
+        opener = urllib.request.build_opener()
+        opener.addheaders = [('User-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/100.0.0.0 Safari/537.36')]
+        urllib.request.install_opener(opener)
         urllib.request.urlretrieve(url, target_path, reporthook=reporthook)
         print("\nDownload complete.")
     except Exception as e:
