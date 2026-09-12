@@ -83,13 +83,19 @@ Softmax probabilities are mathematically bounded and notoriously overconfident o
 
 | Method | Avg Final Accuracy | Avg Forgetting |
 |---|---|---|
-| **Naive FT** (lower bound) | 88.31% | **-2.43%** |
-| **Joint** (upper bound) | 89.23% | 0.88% |
-| **RESONA Replay** (proposed) | **78.02%** | **20.92%** |
-| **RESONA NoReplay** (ablation) | 0.00% (Rejected) | 74.35% |
+| **Naive FT** | 62.44% | **53.66%** |
+| **Joint** (upper bound) | 97.84% | 0.89% |
+| **RESONA Replay** (proposed) | **98.03%** | **11.02%** |
+| **RESONA NoReplay** (ablation) | 40.13% | 87.99% |
+| **DER++**| 94.29% | 2.05% |
+| **LwF**| 90.99% | 3.56% |
+| **EWC** | 40.64% | 86.23% |
+
+
+
 
 *Note: Naive FT experienced "backward transfer" (negative forgetting) due to the extreme acoustic similarity of the MIMII pump dataset tasks, where learning Task 3 slightly improved the filters for Task 1.*
-*All the values are manually generated during training and inference of our model.None of them is hardcoded*
+*All the values are manually generated during training and inference of our model.None of them is hardcoded *
 
 ---
 
