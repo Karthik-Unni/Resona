@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, View, Text, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, StatusBar, TextInput, SafeAreaView
+  Alert, ActivityIndicator, StatusBar, TextInput
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 // Replace with your computer's local IP (shown when you run api.py)
@@ -70,27 +71,59 @@ function MiniSpectrogram({ status }) {
 }
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
-export default function App() {
+function MainApp() {
   const [screen, setScreen] = useState('overview'); // 'overview' | 'review' | 'demo'
   const [state, setState] = useState(null);
+  const [alerts, setAlerts] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [evalMetrics, setEvalMetrics] = useState({});
+  const [latestInference, setLatestInference] = useState(null);
+
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedCondition, setSelectedCondition] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  const [activeReview, setActiveReview] = useState(null);
 
   useEffect(() => { 
-    fetchStatus(); 
-    const timer = setInterval(fetchStatus, 1000);
+    fetchAll(); 
+    const timer = setInterval(fetchAll, 2000);
     return () => clearInterval(timer);
   }, []);
 
-  async function fetchStatus() {
+  async function fetchAll() {
     try {
-      const res = await fetch(`${API_BASE}/status`);
-      const data = await res.json();
-      setState(data);
-    } catch (e) { /* backend offline */ }
+      const [resStatus, resAlerts, resReviews, resEval, resLatest] = await Promise.all([
+        fetch(`${API_BASE}/status`).catch(()=>null),
+        fetch(`${API_BASE}/alerts`).catch(()=>null),
+        fetch(`${API_BASE}/reviews/pending`).catch(()=>null),
+        fetch(`${API_BASE}/evaluation`).catch(()=>null),
+        fetch(`${API_BASE}/latest`).catch(()=>null)
+      ]);
+      
+      if(resStatus && resStatus.ok) setState(await resStatus.json());
+      if(resAlerts && resAlerts.ok) setAlerts(await resAlerts.json());
+      
+      if(resReviews && resReviews.ok) {
+        const revs = await resReviews.json();
+        setReviews(revs);
+        setActiveReview(prev => {
+          if (!prev && revs.length > 0) return revs[0];
+          if (prev && !revs.find(r => r.id === prev.id)) return revs.length > 0 ? revs[0] : null;
+          return prev;
+        });
+      }
+      
+      if(resEval && resEval.ok) {
+        const d = await resEval.json();
+        if(d.available) setEvalMetrics(d.results || {});
+      }
+
+      if(resLatest && resLatest.ok) {
+        const d = await resLatest.json();
+        if(d.available) setLatestInference(d.result);
+      }
+    } catch (e) { /* silent fail */ }
   }
 
   async function runTestCase(tc) {
@@ -103,7 +136,9 @@ export default function App() {
         body: JSON.stringify({ test_case: tc }),
       });
       const data = await res.json();
-      if (data.success) setState(data.state);
+      if (!data.success) {
+        Alert.alert('Error', data.error || 'Failed to simulate');
+      }
     } catch (e) {
       Alert.alert('Error', 'Backend offline. Start api.py on your computer.');
     } finally { setLoading(false); }
@@ -114,36 +149,34 @@ export default function App() {
       Alert.alert('Required', 'Please select the machine condition.');
       return;
     }
-    const labelMap = { normal: 'NORMAL', anomalous: 'KNOWN ANOMALY', new_condition: 'NEW CONDITION' };
+    if (!activeReview) return;
+
+    const labelMap = { normal: 'NORMAL', anomalous: 'ANOMALOUS', new_condition: 'NEW CONDITION' };
     setLoading(true);
     try {
       await fetch(`${API_BASE}/human_feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: labelMap[selectedCondition] }),
+        body: JSON.stringify({ label: labelMap[selectedCondition], review_id: activeReview.id, notes }),
       });
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 4000);
       setSelectedCondition(null);
       setNotes('');
+      // Refresh to clear review
+      fetchAll();
     } catch (e) {
       Alert.alert('Error', 'Could not reach backend.');
     } finally { setLoading(false); }
   }
 
-  async function loadResults() {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/results`);
-      const data = await res.json();
-      setResults(data.data || 'No results found.');
-      setScreen('demo');
-    } catch (e) {
-      setResults('Backend offline. Run: python app/backend/api.py');
-    } finally { setLoading(false); }
-  }
-
-  const ss = state ? getStatusStyle(state.status) : getStatusStyle(null);
+  // Derived states for UI
+  const systemStatusStr = state?.active_alerts_count > 0 ? 'ATTENTION REQUIRED' : (state?.system || 'OFFLINE');
+  const systemStatusColor = state?.active_alerts_count > 0 ? C.red : (state?.system ? C.green : C.textMuted);
+  const bgStatusColor = state?.active_alerts_count > 0 ? C.redBg : (state?.system ? C.greenBg : C.border);
+  
+  const resonaMetrics = evalMetrics['RESONA_Replay'] || {};
+  const naiveMetrics = evalMetrics['Naive_FT'] || {};
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -156,12 +189,10 @@ export default function App() {
           <Text style={styles.brandSub}>ACOUSTIC HMI · MOBILE</Text>
         </View>
         <View style={styles.headerRight}>
-          {state && (
-            <View style={[styles.statusPill, { backgroundColor: ss.bg, borderColor: ss.dot }]}>
-              <View style={[styles.statusDot, { backgroundColor: ss.dot }]} />
-              <Text style={[styles.statusPillText, { color: ss.color }]}>{state.status}</Text>
-            </View>
-          )}
+          <View style={[styles.statusPill, { backgroundColor: bgStatusColor, borderColor: systemStatusColor }]}>
+            <View style={[styles.statusDot, { backgroundColor: systemStatusColor }]} />
+            <Text style={[styles.statusPillText, { color: systemStatusColor }]}>{systemStatusStr}</Text>
+          </View>
         </View>
       </View>
 
@@ -170,6 +201,9 @@ export default function App() {
         {[['overview','Overview'], ['review','Review'], ['demo','Demo']].map(([id, label]) => (
           <TouchableOpacity key={id} style={[styles.tab, screen === id && styles.tabActive]} onPress={() => setScreen(id)}>
             <Text style={[styles.tabText, screen === id && styles.tabTextActive]}>{label}</Text>
+            {id === 'review' && reviews.length > 0 && (
+              <View style={styles.badgeCount}><Text style={styles.badgeCountText}>{reviews.length}</Text></View>
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -193,12 +227,12 @@ export default function App() {
             <View style={styles.kpiGrid}>
               <View style={styles.kpiCard}>
                 <Text style={styles.kpiLabel}>RESONA Forgetting</Text>
-                <Text style={[styles.kpiValue, { color: C.green }]}>3.55%</Text>
-                <Text style={styles.kpiSub}>vs Naive: 86.80%</Text>
+                <Text style={[styles.kpiValue, { color: C.green }]}>{resonaMetrics.avg_forgetting || '—'}</Text>
+                <Text style={styles.kpiSub}>vs Naive: {naiveMetrics.avg_forgetting || '—'}</Text>
               </View>
               <View style={styles.kpiCard}>
                 <Text style={styles.kpiLabel}>Final Accuracy</Text>
-                <Text style={[styles.kpiValue, { color: C.primary }]}>94.59%</Text>
+                <Text style={[styles.kpiValue, { color: C.primary }]}>{resonaMetrics.avg_final_accuracy || '—'}</Text>
                 <Text style={styles.kpiSub}>3 tasks · Replay Buffer</Text>
               </View>
             </View>
@@ -206,31 +240,31 @@ export default function App() {
             {/* Active Issues */}
             <Text style={styles.sectionTitle}>Active Issues</Text>
             <View style={styles.card}>
-              <View style={styles.issueRow}>
-                <View style={styles.issueLeft}>
-                  <View style={[styles.issueDot, { backgroundColor: C.red }]} />
-                  <View>
-                    <Text style={styles.issueName}>Pump 02 · Zone B</Text>
-                    <Text style={styles.issueDesc}>Known acoustic anomaly detected. CNN: 88%</Text>
+              {alerts.length === 0 ? (
+                <Text style={{ fontSize: 13, color: C.textMuted, paddingVertical: 10, textAlign: 'center' }}>No active anomalies</Text>
+              ) : (
+                alerts.map((a, i) => (
+                  <View key={a.id}>
+                    <View style={styles.issueRow}>
+                      <View style={styles.issueLeft}>
+                        <View style={[styles.issueDot, { backgroundColor: a.decision === 'ANOMALOUS' ? C.red : C.amber }]} />
+                        <View>
+                          <Text style={styles.issueName}>{a.machine_name || `Machine ${a.machine_id}`} · {a.zone}</Text>
+                          <Text style={styles.issueDesc}>
+                            {a.decision === 'ANOMALOUS' ? 'Known acoustic anomaly detected' : 'Unknown OOD pattern detected'}
+                          </Text>
+                        </View>
+                      </View>
+                      {a.decision === 'UNKNOWN' && (
+                        <TouchableOpacity style={styles.issueBtnAmber} onPress={() => { setScreen('review'); }}>
+                          <Text style={[styles.issueBtnText, { color: C.amber }]}>Review</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {i < alerts.length - 1 && <View style={[styles.divider]} />}
                   </View>
-                </View>
-                <TouchableOpacity style={styles.issueBtnRed} onPress={() => runTestCase(2)}>
-                  <Text style={styles.issueBtnText}>Simulate</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={[styles.divider]} />
-              <View style={styles.issueRow}>
-                <View style={styles.issueLeft}>
-                  <View style={[styles.issueDot, { backgroundColor: C.amber }]} />
-                  <View>
-                    <Text style={styles.issueName}>Fan 02 · Zone C</Text>
-                    <Text style={styles.issueDesc}>Unknown OOD pattern. Score: 95.6</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.issueBtnAmber} onPress={() => setScreen('review')}>
-                  <Text style={[styles.issueBtnText, { color: C.amber }]}>Review</Text>
-                </TouchableOpacity>
-              </View>
+                ))
+              )}
             </View>
 
             {/* CL Pipeline Summary */}
@@ -256,94 +290,96 @@ export default function App() {
         {screen === 'review' && (
           <View style={styles.page}>
             <View style={styles.reviewHeader}>
-              <View style={[styles.reviewBadge, { backgroundColor: C.amberBg }]}>
-                <Text style={[styles.reviewBadgeText, { color: C.amber }]}>
-                  {state?.active_review_id ? `REVIEW ID: ${state.active_review_id}` : 'PENDING REVIEW'}
+              <View style={[styles.reviewBadge, { backgroundColor: activeReview ? C.amberBg : C.border }]}>
+                <Text style={[styles.reviewBadgeText, { color: activeReview ? C.amber : C.textSecondary }]}>
+                  {activeReview ? `REVIEW ID: ${activeReview.id.substring(0,8).toUpperCase()}` : 'NO PENDING REVIEWS'}
                 </Text>
               </View>
               <Text style={styles.pageTitle}>Human Review Queue</Text>
               <Text style={styles.pageSubtitle}>Conditions requiring operator verification for human-in-the-loop validation</Text>
             </View>
 
-            {/* AI Advisory */}
-            <View style={[styles.advisory, { backgroundColor: '#EFF6FF', borderLeftColor: C.primary }]}>
-              <Text style={[styles.advisoryTitle, { color: C.primary }]}>AI Perception Advisory</Text>
-              <Text style={styles.advisoryText}>Fan 02 encountered an unfamiliar acoustic pattern (OOD score: 95.6). Human verification needed to update the Continual Learning replay buffer.</Text>
-            </View>
+            {!activeReview ? (
+               <View style={styles.card}>
+                 <Text style={{ fontSize: 13, color: C.textMuted, paddingVertical: 20, textAlign: 'center' }}>You're all caught up! No reviews pending.</Text>
+               </View>
+            ) : (
+              <>
+                {/* AI Advisory */}
+                <View style={[styles.advisory, { backgroundColor: '#EFF6FF', borderLeftColor: C.primary }]}>
+                  <Text style={[styles.advisoryTitle, { color: C.primary }]}>AI Perception Advisory</Text>
+                  <Text style={styles.advisoryText}>{activeReview.machine_name || `Machine ${activeReview.machine_id}`} encountered an unfamiliar acoustic pattern (OOD score: {activeReview.ood_score?.toFixed(1) || 'N/A'}). Human verification needed to update the Continual Learning replay buffer.</Text>
+                </View>
 
-            {/* Machine Info */}
-            <View style={styles.card}>
-              <View style={styles.machineHeader}>
-                <View>
-                  <Text style={styles.machineName}>{state?.current_machine || 'Unknown Machine'}</Text>
-                  <Text style={styles.machineId}>Real-time OOD Score: {state?.unknown_score?.toFixed(1) || '—'}</Text>
-                </View>
-                <View style={[styles.statusPill, { backgroundColor: C.amberBg, borderColor: C.amber }]}>
-                  <View style={[styles.statusDot, { backgroundColor: C.amber }]} />
-                  <Text style={[styles.statusPillText, { color: C.amber, fontSize: 9 }]}>UNFAMILIAR</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Condition Selection */}
-            <Text style={styles.sectionTitle}>Machine Condition *</Text>
-            {[
-              { val: 'normal', label: 'NORMAL OPERATION', sublabel: 'Machine operates correctly', badge: 'Nominal', badgeColor: C.green, badgeBg: C.greenBg },
-              { val: 'anomalous', label: 'ANOMALOUS — FAULT', sublabel: 'Bearing friction, cavitation, etc.', badge: 'Alert L2', badgeColor: C.red, badgeBg: C.redBg },
-              { val: 'new_condition', label: 'NEW / UNRECOGNIZED', sublabel: 'Valid new state — AI will learn', badge: 'Learn', badgeColor: C.blue, badgeBg: C.blueBg },
-            ].map(opt => (
-              <TouchableOpacity
-                key={opt.val}
-                style={[styles.conditionCard, selectedCondition === opt.val && styles.conditionCardSelected]}
-                onPress={() => setSelectedCondition(opt.val)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.radio, selectedCondition === opt.val && styles.radioSelected]}>
-                  {selectedCondition === opt.val && <View style={styles.radioDot} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.conditionTop}>
-                    <Text style={[styles.conditionLabel, selectedCondition === opt.val && { color: C.primary }]}>{opt.label}</Text>
-                    <View style={[styles.badge, { backgroundColor: opt.badgeBg }]}>
-                      <Text style={[styles.badgeText, { color: opt.badgeColor }]}>{opt.badge}</Text>
+                {/* Machine Info */}
+                <View style={styles.card}>
+                  <View style={styles.machineHeader}>
+                    <View>
+                      <Text style={styles.machineName}>{activeReview.machine_name || `Machine ${activeReview.machine_id}`}</Text>
+                      <Text style={styles.machineId}>Real-time OOD Score: {activeReview.ood_score?.toFixed(1) || '—'}</Text>
+                    </View>
+                    <View style={[styles.statusPill, { backgroundColor: C.amberBg, borderColor: C.amber }]}>
+                      <View style={[styles.statusDot, { backgroundColor: C.amber }]} />
+                      <Text style={[styles.statusPillText, { color: C.amber, fontSize: 9 }]}>UNFAMILIAR</Text>
                     </View>
                   </View>
-                  <Text style={styles.conditionSub}>{opt.sublabel}</Text>
                 </View>
-              </TouchableOpacity>
-            ))}
 
-            {/* Notes */}
-            <Text style={styles.sectionTitle}>Operator Notes (Optional)</Text>
-            <TextInput
-              style={styles.notesInput}
-              multiline
-              numberOfLines={4}
-              placeholder="e.g., Bearing grease cycle at 10:45 AM..."
-              value={notes}
-              onChangeText={setNotes}
-              placeholderTextColor={C.textMuted}
-            />
+                {/* Condition Selection */}
+                <Text style={styles.sectionTitle}>Machine Condition *</Text>
+                {[
+                  { val: 'normal', label: 'NORMAL OPERATION', sublabel: 'Machine operates correctly', badge: 'Nominal', badgeColor: C.green, badgeBg: C.greenBg },
+                  { val: 'anomalous', label: 'ANOMALOUS — FAULT', sublabel: 'Bearing friction, cavitation, etc.', badge: 'Alert L2', badgeColor: C.red, badgeBg: C.redBg },
+                  { val: 'new_condition', label: 'NEW / UNRECOGNIZED', sublabel: 'Valid new state — AI will learn', badge: 'Learn', badgeColor: C.blue, badgeBg: C.blueBg },
+                ].map(opt => (
+                  <TouchableOpacity
+                    key={opt.val}
+                    style={[styles.conditionCard, selectedCondition === opt.val && styles.conditionCardSelected]}
+                    onPress={() => setSelectedCondition(opt.val)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.radio, selectedCondition === opt.val && styles.radioSelected]}>
+                      {selectedCondition === opt.val && <View style={styles.radioDot} />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.conditionTop}>
+                        <Text style={[styles.conditionLabel, selectedCondition === opt.val && { color: C.primary }]}>{opt.label}</Text>
+                        <View style={[styles.badge, { backgroundColor: opt.badgeBg }]}>
+                          <Text style={[styles.badgeText, { color: opt.badgeColor }]}>{opt.badge}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.conditionSub}>{opt.sublabel}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
 
-            {/* Actions */}
-            <TouchableOpacity style={styles.submitBtn} onPress={submitVerification} disabled={loading}>
-              <Text style={styles.submitBtnText}>SUBMIT VERIFICATION</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.assignBtn} onPress={() => Alert.alert('Dispatched', 'Field dispatch alert sent to Zone C on-duty technician.')}>
-              <Text style={styles.assignBtnText}>Assign Field Technician</Text>
-            </TouchableOpacity>
+                {/* Notes */}
+                <Text style={styles.sectionTitle}>Operator Notes (Optional)</Text>
+                <TextInput
+                  style={styles.notesInput}
+                  multiline
+                  numberOfLines={4}
+                  placeholder="e.g., Bearing grease cycle at 10:45 AM..."
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholderTextColor={C.textMuted}
+                />
 
-            {submitted && (
-              <View style={[styles.toast, { backgroundColor: C.greenBg }]}>
-                <Text style={[styles.toastText, { color: C.green }]}>✓ Verification recorded. Token dispatched to Continual Learning buffer.</Text>
-              </View>
+                {/* Actions */}
+                <TouchableOpacity style={styles.submitBtn} onPress={submitVerification} disabled={loading}>
+                  <Text style={styles.submitBtnText}>SUBMIT VERIFICATION</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.assignBtn} onPress={() => Alert.alert('Dispatched', 'Field dispatch alert sent to Zone C on-duty technician.')}>
+                  <Text style={styles.assignBtnText}>Assign Field Technician</Text>
+                </TouchableOpacity>
+
+                {submitted && (
+                  <View style={[styles.toast, { backgroundColor: C.greenBg }]}>
+                    <Text style={[styles.toastText, { color: C.green }]}>✓ Verification recorded. Token dispatched to Continual Learning buffer.</Text>
+                  </View>
+                )}
+              </>
             )}
-
-            {/* Mobile Spectrogram */}
-            <Text style={styles.sectionTitle}>Live Acoustic View</Text>
-            <View style={styles.card}>
-              <MiniSpectrogram status={state?.status} />
-            </View>
           </View>
         )}
 
@@ -354,30 +390,33 @@ export default function App() {
             <Text style={styles.pageSubtitle}>Simulate machine conditions · Backend: {API_BASE}</Text>
 
             {/* Current State */}
-            {state && (
-              <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: ss.dot }]}>
+            {latestInference ? (
+              <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: getStatusStyle(latestInference.decision).dot }]}>
                 <View style={styles.stateRow}>
-                  <View style={[styles.statusPill, { backgroundColor: ss.bg, borderColor: ss.dot }]}>
-                    <View style={[styles.statusDot, { backgroundColor: ss.dot }]} />
-                    <Text style={[styles.statusPillText, { color: ss.color }]}>{state.status}</Text>
+                  <View style={[styles.statusPill, { backgroundColor: getStatusStyle(latestInference.decision).bg, borderColor: getStatusStyle(latestInference.decision).dot }]}>
+                    <View style={[styles.statusDot, { backgroundColor: getStatusStyle(latestInference.decision).dot }]} />
+                    <Text style={[styles.statusPillText, { color: getStatusStyle(latestInference.decision).color }]}>{latestInference.decision}</Text>
                   </View>
+                  <Text style={{ fontSize: 10, color: C.textSecondary, fontFamily: 'monospace' }}>Machine: {latestInference.machine_id}</Text>
                 </View>
                 <View style={styles.metricRow}>
                   <View style={styles.metricItem}>
                     <Text style={styles.metricLabel}>CONFIDENCE</Text>
-                    <Text style={styles.metricValue}>{state.confidence ? (state.confidence * 100).toFixed(1) + '%' : '—'}</Text>
+                    <Text style={styles.metricValue}>{latestInference.confidence ? (latestInference.confidence * 100).toFixed(1) + '%' : '—'}</Text>
                   </View>
                   <View style={styles.metricItem}>
                     <Text style={styles.metricLabel}>OOD SCORE</Text>
-                    <Text style={styles.metricValue}>{state.unknown_score ? state.unknown_score.toFixed(1) : '—'}</Text>
+                    <Text style={styles.metricValue}>{latestInference.mahalanobis_distance ? latestInference.mahalanobis_distance.toFixed(1) : '—'}</Text>
                   </View>
                   <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>DECISION</Text>
-                    <Text style={styles.metricValue}>{state.last_alert || '—'}</Text>
+                    <Text style={styles.metricLabel}>LATENCY</Text>
+                    <Text style={styles.metricValue}>{latestInference.total_latency_ms ? Math.round(latestInference.total_latency_ms) + 'ms' : '—'}</Text>
                   </View>
                 </View>
-                <MiniSpectrogram status={state.status} />
+                <MiniSpectrogram status={latestInference.decision} />
               </View>
+            ) : (
+              <View style={styles.card}><Text style={{ fontSize: 13, color: C.textMuted, padding: 20, textAlign: 'center' }}>No live inference events yet.</Text></View>
             )}
 
             {/* Scenario buttons */}
@@ -387,36 +426,29 @@ export default function App() {
               [2, '🔴 Known Anomaly (Bearing)', 'Pump 02 · CNN confidence 88%'],
               [3, '🟢 Normal w/ 0dB Noise', 'Noise-robust · 85% confidence'],
               [4, '🔴 Noisy Anomaly Signal', 'High noise · 79% confidence'],
-              [5, '🟡 Unknown — OOD Flagged', 'Mahalanobis 95.6 · Human loop'],
+              [5, '🟡 Unknown — OOD Flagged', 'Mahalanobis > Threshold · Human loop'],
               [6, '🟡 Trigger Human Verification', 'Monitoring → Human Review Agent'],
               [7, '🔵 Post-Learning Recognition', 'Learning Agent updated model'],
-              [8, '🟣 Forgetting Evaluation', 'RESONA: 3.55% vs Naive: 86.80%'],
+              [8, '🟣 Forgetting Evaluation', 'Verify historical task accuracy'],
             ].map(([tc, label, sub]) => (
               <TouchableOpacity key={tc} style={styles.demoBtn} onPress={() => runTestCase(tc)} activeOpacity={0.8}>
                 <Text style={styles.demoBtnLabel}>{label}</Text>
                 <Text style={styles.demoBtnSub}>{sub}</Text>
               </TouchableOpacity>
             ))}
-
-            <TouchableOpacity style={[styles.demoBtn, { borderColor: C.primary }]} onPress={loadResults} activeOpacity={0.8}>
-              <Text style={[styles.demoBtnLabel, { color: C.primary }]}>📊 Load Evaluation Metrics</Text>
-              <Text style={styles.demoBtnSub}>Read from results/results_RESONA_Replay.txt</Text>
-            </TouchableOpacity>
-
-            {/* Results */}
-            {results !== '' && (
-              <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Evaluation Results</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <Text style={styles.resultsText}>{results}</Text>
-                </ScrollView>
-              </View>
-            )}
           </View>
         )}
 
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <MainApp />
+    </SafeAreaProvider>
   );
 }
 
@@ -437,10 +469,12 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   tabBar: { flexDirection: 'row', backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 6 },
   tabActive: { borderBottomColor: C.textPrimary },
   tabText: { fontSize: 12, color: C.textMuted, fontWeight: '500' },
   tabTextActive: { color: C.textPrimary, fontWeight: '700' },
+  badgeCount: { backgroundColor: C.red, borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1 },
+  badgeCountText: { color: '#FFF', fontSize: 9, fontWeight: 'bold' },
 
   loadingBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 8, backgroundColor: '#EFF6FF', gap: 8 },
   loadingText: { fontSize: 12, color: C.primary, fontFamily: 'monospace' },
@@ -518,6 +552,4 @@ const styles = StyleSheet.create({
   demoBtn: { backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 12, marginBottom: 8 },
   demoBtnLabel: { fontSize: 13, fontWeight: '600', color: C.textPrimary, marginBottom: 2 },
   demoBtnSub: { fontSize: 10, color: C.textMuted, fontFamily: 'monospace' },
-
-  resultsText: { fontSize: 11, fontFamily: 'monospace', color: C.textSecondary, lineHeight: 18 },
 });
