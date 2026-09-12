@@ -1,0 +1,6 @@
+{
+  "threshold": 296.2603081276692,
+  "threshold_percentile": 95,
+  "calibrated_with_n_samples": 920,
+  "model_version": "RESONA_v3_RESONA_Replay"
+}

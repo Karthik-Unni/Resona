@@ -48,6 +48,10 @@ class MahalanobisDetector:
         distances = []
         for i in range(len(features)):
             x = features[i]
+            if not self.class_means:
+                distances.append(0.0)
+                continue
+                
             if labels is not None:
                 mean = self.class_means[labels[i]]
                 diff = x - mean
@@ -67,5 +71,7 @@ class MahalanobisDetector:
         """
         Returns boolean array: True if Unknown, False if Known
         """
+        if self.threshold is None:
+            return np.zeros(len(features), dtype=bool)
         distances = self.score_samples(features)
         return distances > self.threshold
