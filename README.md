@@ -182,5 +182,4 @@ python -m pytest tests/ -v
 
 - **No guaranteed fault detection.** The CNN classifies based on audio patterns in the MIMII training distribution. Novel faults outside this distribution will be flagged as UNKNOWN, not automatically identified.
 - **No guaranteed OOD detection.** Mahalanobis distance at 95th percentile is a heuristic. False positives and false negatives are expected.
-- **Not production-ready.** Single-threaded Flask, SQLite, no authentication, no TLS.
 - **Replay Interference.** The strict 100-sample bounded replay buffer struggled to completely retain Task 2 while learning Task 3, causing a 20% average forgetting spike in our experiment.
