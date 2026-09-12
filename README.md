@@ -21,7 +21,15 @@
 > This is a hackathon-grade research prototype submitted for **TRACK 5 — Continual Learning**.
 
 ---
+RESONA — Adaptive Acoustic Intelligence for Machine Monitoring is a deep-learning-based acoustic condition monitoring system designed to detect abnormal machine behavior from sound while continuously adapting to new operating conditions.
 
+The system processes machine audio into Log-Mel spectrograms and uses a lightweight custom CNN to learn acoustic patterns associated with machine conditions. Instead of forcing the classifier to make a prediction when it encounters an unfamiliar sound, RESONA uses Out-of-Distribution (OOD) detection to distinguish between known conditions and previously unseen acoustic patterns.
+
+When an unfamiliar condition is detected, the system creates a human-review request. A technician can verify the condition through the web or mobile interface, and the verified sample is added to a replay buffer. The continual-learning pipeline then uses the new information together with previously learned samples, allowing the model to adapt while reducing catastrophic forgetting.
+
+The project also includes an edge-oriented deployment architecture, where a simulated Raspberry Pi edge node performs local audio preprocessing, inference, and OOD evaluation before sending compact events to the backend. A web-based industrial HMI provides live monitoring, alerts, review workflows, model status, and evaluation results, while a mobile interface enables field technicians to verify detected conditions.
+
+A major focus of the project is not only classification accuracy, but also continual-learning behavior. We compare different learning strategies and analyze metrics such as final accuracy, forgetting, and backward transfer to evaluate whether the system can learn new acoustic conditions while retaining — and in some cases improving — knowledge of previously learned tasks.
 ## 🏆 TRACK 5 — Continual Learning Requirements
 
 **Scoped Problem:** Learn a sequence of tasks without forgetting earlier ones.
@@ -41,6 +49,9 @@
 
 All of the Continual Learning metrics, architecture comparisons (SimpleCNN vs ResNet-18), and mathematical proofs of our results (including proof of backward transfer) are fully executed and documented in this notebook:
 **👉 [View the Jupyter Notebook here: notebooks/CustomCNN_vs_ResNet18.ipynb](notebooks/CustomCNN_vs_ResNet18.ipynb) 👈**
+<img width="862" height="574" alt="image" src="https://github.com/user-attachments/assets/0965ecd8-fc7d-4fd8-af9a-b60ad96e9841" />
+Accuracy Improvement Demonstrating Backward Transfer in Continual Learning
+
 
 ---
 
@@ -156,6 +167,14 @@ python -m pytest tests/ -v
 5. In Review Queue, click the pending review → select **NEW CONDITION** → Submit
 6. A background learning job is queued (see `/api/learning_jobs`)
 7. View **Evaluation** tab for CL experiment results from JSON artifacts
+
+<img width="1600" height="900" alt="image" src="https://github.com/user-attachments/assets/6706f85d-efc5-4274-848d-b29961e72a35" />
+<img width="500" height="900" alt="image" src="https://github.com/user-attachments/assets/f9e5dad0-bbbc-49b1-a046-1c0e66527a17" />
+<img width="500" height="900" alt="image" src="https://github.com/user-attachments/assets/75353397-1455-4861-b80c-943a7bcda4ff" />
+
+
+
+
 
 ---
 
