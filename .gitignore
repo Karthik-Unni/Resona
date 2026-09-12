@@ -10,10 +10,7 @@ build/
 
 # Data files (too large for git)
 data/raw/
-data/processed/
-*.zip
-*.wav
-*.npy
+
 
 # Model weights (too large)
 
