@@ -1,4 +1,4 @@
-# 🎧 RESONA
+#  RESONA
 
 ### **Adaptive Acoustic Intelligence for Machine Monitoring**
 
