@@ -20,7 +20,7 @@
 
 ## 📊 Notebook & Proof of Metrics
 
-> ⚠️ **JUDGES (MISS): Please review the Jupyter Notebook below!** 
+> ⚠️ **MISS: Please review the Jupyter Notebook below!** 
 
 All of the Continual Learning metrics, architecture comparisons (SimpleCNN vs ResNet-18), and mathematical proofs of our results (including proof of backward transfer) are fully executed and documented in this notebook:
 **👉 [View the Jupyter Notebook here: notebooks/CustomCNN_vs_ResNet18.ipynb](notebooks/CustomCNN_vs_ResNet18.ipynb) 👈**
