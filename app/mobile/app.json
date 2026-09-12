@@ -3,24 +3,19 @@
     "name": "RESONA Mobile HMI",
     "slug": "resona-mobile",
     "version": "1.0.0",
+    "sdkVersion": "57.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "backgroundColor": "#F8F9FA"
-    },
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.resona.mobile"
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#F8F9FA"
-      },
       "package": "com.resona.mobile"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro"
     }
   }
 }

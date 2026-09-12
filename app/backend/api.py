@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import random
 import yaml
@@ -18,8 +18,18 @@ import tempfile
 import numpy as np
 from src.audio.preprocess import extract_log_mel_spectrogram
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../frontend')
 CORS(app)
+
+FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
+
+@app.route('/')
+def serve_desktop():
+    return send_from_directory(FRONTEND_DIR, 'index.html')
+
+@app.route('/mobile')
+def serve_mobile():
+    return send_from_directory(FRONTEND_DIR, 'mobile.html')
 
 # Initialize Real Learner
 model_config = yaml.safe_load(open("config/model.yaml"))
