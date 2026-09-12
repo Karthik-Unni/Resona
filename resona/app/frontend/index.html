@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RESONA - Adaptive Acoustic Intelligence</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --primary: #3b82f6;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            background: linear-gradient(90deg, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.5rem;
+            margin: 0;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: var(--surface);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-top: 10px;
+        }
+        .NORMAL { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+        .KNOWN_ANOMALY { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .UNKNOWN_CONDITION { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        
+        .controls button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+        }
+        .controls button:hover {
+            opacity: 0.9;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+        }
+        #human-review-panel {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            border: 2px dashed var(--warning);
+            border-radius: 8px;
+        }
+        #qr-code {
+            text-align: center;
+            margin-top: 20px;
+        }
+        #qr-code img {
+            border: 10px solid white;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>RESONA</h1>
+        <p>Adaptive Acoustic Intelligence for Machine Monitoring</p>
+    </div>
+
+    <div class="container">
+        <!-- Live Monitor -->
+        <div class="card">
+            <h2>Live Monitor</h2>
+            <div style="font-size: 1.2rem;">Machine ID: <strong id="machine-id">pump_00</strong></div>
+            <div id="status-badge" class="status-badge NORMAL">🟢 NORMAL</div>
+            
+            <div style="margin-top: 20px;">
+                <div class="metric">
+                    <span>Confidence (Known Classes):</span>
+                    <strong id="confidence">0.00%</strong>
+                </div>
+                <div class="metric">
+                    <span>Unknown/OOD Score:</span>
+                    <strong id="unknown-score">0.00</strong>
+                </div>
+                <div class="metric">
+                    <span>Agent Action:</span>
+                    <strong id="agent-action">LOG_ONLY</strong>
+                </div>
+            </div>
+
+            <div id="human-review-panel">
+                <h3 style="color: var(--warning); margin-top:0;">⚠️ Human Verification Required</h3>
+                <p>The model detected a sound pattern outside its known distribution. Please verify:</p>
+                <button onclick="submitFeedback('NORMAL')" style="background: var(--success);">NORMAL</button>
+                <button onclick="submitFeedback('KNOWN ANOMALY')" style="background: var(--danger);">KNOWN ANOMALY</button>
+                <button onclick="submitFeedback('NEW CONDITION')" style="background: var(--warning);">NEW CONDITION</button>
+            </div>
+            
+            <div id="qr-code">
+                <p>Scan to Monitor on Mobile</p>
+                <!-- Using a public API for QR generation for demo -->
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=RESONA-Mobile-View-Pump-00" alt="QR Code">
+            </div>
+        </div>
+
+        <!-- Demo Controls -->
+        <div class="card">
+            <h2>Demo Scenarios</h2>
+            <div class="controls">
+                <button onclick="runTestCase(1)">1. Normal Machine</button>
+                <button onclick="runTestCase(2)">2. Known Anomaly</button>
+                <button onclick="runTestCase(3)">3. Noisy Normal</button>
+                <button onclick="runTestCase(4)">4. Noisy Anomaly</button>
+                <button onclick="runTestCase(5)">5. Unknown Condition</button>
+            </div>
+            
+            <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
+            
+            <h2>Continual Learning Results</h2>
+            <button onclick="fetchResults()" style="background: #8b5cf6;">Load Evaluation Metrics</button>
+            <pre id="results-display" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 6px; overflow-x: auto; margin-top: 15px;">
+Results will appear here...
+            </pre>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+
+        async function updateDashboard(state, event) {
+            document.getElementById('machine-id').innerText = state.current_machine;
+            
+            const badge = document.getElementById('status-badge');
+            badge.innerText = state.status;
+            badge.className = `status-badge ${state.status.replace(' ', '_')}`;
+            
+            if (state.status.includes("NORMAL")) badge.innerText = "🟢 " + state.status;
+            if (state.status.includes("ANOMALY")) badge.innerText = "🔴 " + state.status;
+            if (state.status.includes("UNKNOWN")) badge.innerText = "⚠️ " + state.status;
+
+            document.getElementById('confidence').innerText = (state.confidence * 100).toFixed(2) + '%';
+            document.getElementById('unknown-score').innerText = state.unknown_score.toFixed(2);
+            document.getElementById('agent-action').innerText = state.last_alert || 'LOG_ONLY';
+
+            const hrPanel = document.getElementById('human-review-panel');
+            if (state.is_unknown) {
+                hrPanel.style.display = 'block';
+            } else {
+                hrPanel.style.display = 'none';
+            }
+        }
+
+        async function runTestCase(caseId) {
+            const res = await fetch(`${API_URL}/simulate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ test_case: caseId })
+            });
+            const data = await res.json();
+            updateDashboard(data.state, data.event);
+        }
+
+        async function submitFeedback(label) {
+            const res = await fetch(`${API_URL}/human_feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ label: label })
+            });
+            const data = await res.json();
+            alert(data.message);
+            // reset UI
+            document.getElementById('human-review-panel').style.display = 'none';
+            document.getElementById('status-badge').innerText = "🔄 LEARNING NEW CONDITION...";
+        }
+
+        async function fetchResults() {
+            const res = await fetch(`${API_URL}/results`);
+            const data = await res.json();
+            document.getElementById('results-display').innerText = data.data;
+        }
+        
+        // Init
+        runTestCase(1);
+    </script>
+</body>
+</html>

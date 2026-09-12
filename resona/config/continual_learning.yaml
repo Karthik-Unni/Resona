@@ -1,0 +1,8 @@
+# continual_learning.yaml
+method: "RESONA_Replay" # Options: "Naive_FT", "Joint", "RESONA_Replay"
+memory_budget_per_class: 100 # How many samples per class to store in replay buffer
+buffer_selection: "random" # "random" or "herding"
+
+# Continual Learning Agent thresholds
+forgetting_tolerance: 0.15 # If forgetting > 15%, alert learning agent
+min_new_class_accuracy: 0.70 # Minimum accuracy on new condition to accept model update

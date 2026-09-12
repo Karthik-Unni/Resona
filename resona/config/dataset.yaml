@@ -1,0 +1,32 @@
+# dataset.yaml
+dataset_name: "MIMII_Pump_0dB"
+data_dir: "data/processed"
+raw_dir: "data/raw"
+
+machine_type: "pump"
+snr: "0_dB"
+sample_rate: 16000
+duration_sec: 10.0 # Standard MIMII files are ~10s
+n_mels: 64
+n_fft: 1024
+hop_length: 512
+
+tasks:
+  - id: 1
+    name: "Task 1 (Pump 00)"
+    machine_ids: ["00"]
+  - id: 2
+    name: "Task 2 (Pump 02)"
+    machine_ids: ["02"]
+  - id: 3
+    name: "Task 3 (Pump 04)"
+    machine_ids: ["04"]
+
+ood_machine_ids: ["06"] # Held-out completely for unknown condition demo
+
+# Train/Val/Test split ratios
+train_ratio: 0.7
+val_ratio: 0.15
+test_ratio: 0.15
+
+random_seed: 42

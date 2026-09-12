@@ -1,0 +1,16 @@
+# model.yaml
+model_type: "SimpleCNN"
+input_channels: 1
+num_classes: 2 # Normal and Anomaly (for known machine conditions)
+dropout_rate: 0.3
+learning_rate: 0.001
+batch_size: 64
+epochs_per_task: 20
+
+# Architecture specifics
+conv_filters: [16, 32, 64, 128]
+kernel_sizes: [3, 3, 3, 3]
+pool_sizes: [2, 2, 2, 2]
+
+# OOD / Unknown Detection
+ood_threshold_percentile: 95 # Calibrate threshold using the 95th percentile of training Mahalanobis distances
