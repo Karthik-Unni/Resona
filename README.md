@@ -28,7 +28,7 @@
 
 ---
 
-## 🚀 What is RESONA?
+##  What is RESONA?
 
 **RESONA** is an adaptive acoustic machine-monitoring system that uses **Deep Learning + Out-of-Distribution Detection + Human-in-the-Loop Continual Learning** to detect known machine conditions, identify unfamiliar acoustic conditions, and incrementally learn verified new conditions while minimizing catastrophic forgetting.
 
