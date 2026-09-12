@@ -1173,8 +1173,14 @@
       document.getElementById('metrics-content').classList.remove('hidden');
       const results = data.results;
 
-      // KPI cards
+      // Update Overview KPI
       const r = results['RESONA_Replay'];
+      if (r && document.getElementById('kpi-forgetting')) {
+        document.getElementById('kpi-forgetting').textContent = r.avg_forgetting || '—';
+        document.getElementById('kpi-forgetting-detail').textContent = 'Based on latest continual learning evaluation';
+      }
+
+      // KPI cards
       const naive = results['Naive_FT'];
       document.getElementById('metrics-kpi-cards').innerHTML = `
         <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
@@ -1265,6 +1271,7 @@
   loadMachines();
   loadAlerts();
   loadEventLog();
+  loadEvaluation();
 
   // Periodic refresh of event log + alerts
   setInterval(() => { loadAlerts(); loadEventLog(); }, 3000);
