@@ -79,7 +79,11 @@ export default function App() {
   const [selectedCondition, setSelectedCondition] = useState(null);
   const [submitted, setSubmitted] = useState(false);
 
-  useEffect(() => { fetchStatus(); }, []);
+  useEffect(() => { 
+    fetchStatus(); 
+    const timer = setInterval(fetchStatus, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   async function fetchStatus() {
     try {
@@ -253,7 +257,9 @@ export default function App() {
           <View style={styles.page}>
             <View style={styles.reviewHeader}>
               <View style={[styles.reviewBadge, { backgroundColor: C.amberBg }]}>
-                <Text style={[styles.reviewBadgeText, { color: C.amber }]}>ACTION REQ-08812</Text>
+                <Text style={[styles.reviewBadgeText, { color: C.amber }]}>
+                  {state?.active_review_id ? `REVIEW ID: ${state.active_review_id}` : 'PENDING REVIEW'}
+                </Text>
               </View>
               <Text style={styles.pageTitle}>Human Review Queue</Text>
               <Text style={styles.pageSubtitle}>Conditions requiring operator verification for human-in-the-loop validation</Text>
@@ -269,8 +275,8 @@ export default function App() {
             <View style={styles.card}>
               <View style={styles.machineHeader}>
                 <View>
-                  <Text style={styles.machineName}>FAN 02 — Exhaust Blower</Text>
-                  <Text style={styles.machineId}>ID: BLW-EX-02 · Zone C (Cooling Bay)</Text>
+                  <Text style={styles.machineName}>{state?.current_machine || 'Unknown Machine'}</Text>
+                  <Text style={styles.machineId}>Real-time OOD Score: {state?.unknown_score?.toFixed(1) || '—'}</Text>
                 </View>
                 <View style={[styles.statusPill, { backgroundColor: C.amberBg, borderColor: C.amber }]}>
                   <View style={[styles.statusDot, { backgroundColor: C.amber }]} />

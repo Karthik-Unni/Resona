@@ -16,7 +16,7 @@ data/processed/
 *.npy
 
 # Model weights (too large)
-results/models/*.pth
+
 
 # Node / Expo
 node_modules/

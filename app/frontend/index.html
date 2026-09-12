@@ -564,10 +564,18 @@
           </div>
         </div>
 
-        <!-- Live Upload -->
-        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-3">
-          <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Live WAV Upload</h2>
-          <p class="text-xs text-slate-500">Upload a real .wav file from your MIMII dataset folder for live ResNet18 inference.</p>
+        <!-- Live Monitoring -->
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-4">
+          <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Live Inference Streaming</h2>
+          
+          <button id="btn-monitor" onclick="toggleMonitoring()" class="w-full text-center px-4 py-3 rounded-lg text-white font-semibold shadow-sm transition-all bg-emerald-500 hover:opacity-90 flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-sm">mic</span>
+            Start Microphone Stream
+          </button>
+          
+          <div class="border-t border-slate-200/60 my-2"></div>
+          
+          <p class="text-xs text-slate-500">Or upload a real .wav file from your MIMII dataset folder for continuous batch inference.</p>
           <label class="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-lg p-6 cursor-pointer hover:border-[#0f4c81] hover:bg-blue-50 transition-all" for="wavUpload">
             <span class="material-symbols-outlined text-slate-400 text-4xl mb-2">upload_file</span>
             <span class="text-sm text-slate-600 font-medium">Drop .wav file or click to browse</span>
@@ -612,14 +620,18 @@
           </div>
         </div>
 
-        <!-- Spectrogram Visualization -->
+        <!-- Visualization -->
         <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col gap-3">
           <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Log-Mel Spectrogram</h2>
+            <h2 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Acoustic Signal Processing</h2>
             <span class="text-xs font-mono text-slate-400" id="spectrogram-label">Awaiting signal...</span>
           </div>
+          
+          <h3 class="text-xs font-semibold text-slate-500 mt-2">Raw Audio Waveform (Downsampled)</h3>
+          <canvas id="waveform-canvas" width="600" height="60" class="w-full rounded-lg border border-slate-200"></canvas>
+          
+          <h3 class="text-xs font-semibold text-slate-500 mt-2">Log-Mel Spectrogram (64 Mel filterbanks · 10s window)</h3>
           <canvas id="spectrogram-canvas" width="600" height="200" class="w-full rounded-lg"></canvas>
-          <p class="text-xs text-slate-400 font-mono">64 Mel filterbanks · 10s window · 16kHz sample rate · STFT hop: 512</p>
         </div>
 
         <!-- Results Text -->
@@ -733,11 +745,16 @@
 
 <script>
   const API_BASE = 'http://127.0.0.1:5000/api';
+  let isMonitoring = false;
+  let mediaRecorder = null;
+  let audioStream = null;
 
-  // Live clock
+  // Live clock and polling
   setInterval(() => {
     document.getElementById('live-clock').textContent = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'}) + ' UTC';
   }, 1000);
+  
+  setInterval(fetchState, 1000); // Automatically poll backend state
 
   // Tab navigation
   function showTab(tabName) {
@@ -752,94 +769,21 @@
     btn.classList.remove('text-slate-500', 'border-transparent');
   }
 
-  // Refresh
   function refreshTelemetry() {
     const icon = document.getElementById('refresh-icon');
     icon.style.transform = 'rotate(360deg)';
     icon.style.transition = 'transform 0.5s';
     setTimeout(() => { icon.style.transform = ''; icon.style.transition = ''; }, 600);
+    fetchState();
   }
 
-  // Acknowledge
-  function handleAcknowledge(btn) {
-    btn.textContent = 'Acknowledged';
-    btn.disabled = true;
-    btn.classList.add('opacity-40', 'cursor-not-allowed');
-  }
-
-  // Test case runner
-  async function runTestCase(tc) {
-    showTab('demo');
+  async function fetchState() {
     try {
-      const res = await fetch(`${API_BASE}/simulate`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({test_case: tc})
-      });
-      const data = await res.json();
-      if (data.success) updateResultsUI(data.state, data.event);
+      const res = await fetch(`${API_BASE}/status`);
+      const state = await res.json();
+      updateResultsUI(state, null);
     } catch (e) {
-      document.getElementById('result-status').textContent = 'Backend offline';
-    }
-  }
-
-  function updateResultsUI(state, event) {
-    document.getElementById('result-status').textContent = state.status;
-    document.getElementById('result-confidence').textContent = state.confidence ? (state.confidence * 100).toFixed(1) + '%' : '—';
-    document.getElementById('result-ood').textContent = state.unknown_score ? state.unknown_score.toFixed(1) : '—';
-    document.getElementById('result-decision').textContent = event ? event.decision : state.last_alert || '—';
-
-    const badge = document.getElementById('result-badge');
-    const banner = document.getElementById('alert-banner');
-    badge.className = 'px-3 py-1 rounded-full text-xs font-mono font-semibold uppercase';
-    banner.className = 'p-3 rounded-lg text-sm flex items-center gap-2';
-
-    if (state.is_unknown) {
-      badge.classList.add('status-unknown');
-      banner.classList.add('bg-amber-50', 'text-amber-900');
-      banner.classList.remove('hidden');
-      document.getElementById('alert-icon').textContent = 'warning';
-      document.getElementById('alert-text').textContent = '⚠ Unknown Condition Flagged — Mahalanobis OOD score: ' + state.unknown_score?.toFixed(1) + '. Human Review Agent triggered. Check Review Queue.';
-    } else if (state.prediction === 1) {
-      badge.classList.add('status-anomaly');
-      banner.classList.add('bg-red-50', 'text-rose-900');
-      banner.classList.remove('hidden');
-      document.getElementById('alert-icon').textContent = 'error';
-      document.getElementById('alert-text').textContent = '🔴 Known Anomaly Detected — Monitoring Agent issued ALERT. Maintenance required.';
-    } else if (state.prediction === 2) {
-      badge.classList.add('status-new');
-      banner.classList.add('bg-blue-50', 'text-blue-900');
-      banner.classList.remove('hidden');
-      document.getElementById('alert-icon').textContent = 'school';
-      document.getElementById('alert-text').textContent = '🔵 New Condition Recognized — Learning Agent successfully updated model.';
-    } else {
-      badge.classList.add('status-normal');
-      banner.classList.add('hidden');
-    }
-
-    drawSpectrogram(state.status);
-    document.getElementById('spectrogram-label').textContent = 'Pump 00 · MIMII 0dB · Real-time simulation';
-  }
-
-  // Draw pseudo spectrogram
-  function drawSpectrogram(status) {
-    const canvas = document.getElementById('spectrogram-canvas');
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width, h = canvas.height;
-    ctx.fillStyle = '#111827';
-    ctx.fillRect(0, 0, w, h);
-    for (let x = 0; x < w; x++) {
-      for (let y = 0; y < h; y++) {
-        const freq = 1 - y / h;
-        let intensity = Math.random() * 0.15;
-        // Add harmonic patterns
-        if (Math.abs(Math.sin(x * 0.05 + freq * Math.PI * 3)) > 0.7) intensity += 0.4;
-        if (status === 'KNOWN ANOMALY' && freq > 0.6) intensity += Math.random() * 0.5;
-        if (status === 'UNKNOWN CONDITION') intensity += Math.random() > 0.95 ? 0.8 : 0;
-        intensity = Math.min(1, intensity);
-        const r = Math.floor(intensity * 220), g = Math.floor(intensity * 80), b = Math.floor((1 - intensity) * 180 + 40);
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
-        ctx.fillRect(x, y, 1, 1);
-      }
+      console.log("Backend offline");
     }
   }
 
@@ -852,6 +796,46 @@
       document.getElementById('results-output').textContent = data.data || 'No results file found.';
     } catch (e) {
       document.getElementById('results-output').textContent = 'Backend offline. Run: python app/backend/api.py';
+    }
+  }
+
+  // Microphone monitoring
+  async function toggleMonitoring() {
+    const btn = document.getElementById('btn-monitor');
+    if (isMonitoring) {
+      isMonitoring = false;
+      if (mediaRecorder) mediaRecorder.stop();
+      if (audioStream) audioStream.getTracks().forEach(t => t.stop());
+      btn.textContent = 'Start Microphone Stream';
+      btn.classList.replace('bg-red-500', 'bg-emerald-500');
+      return;
+    }
+
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(audioStream);
+      
+      mediaRecorder.ondataavailable = async (e) => {
+        if (!isMonitoring) return;
+        const formData = new FormData();
+        const blob = new Blob([e.data], { type: 'audio/wav' }); // or webm depending on browser
+        formData.append('audio', blob, 'chunk.wav');
+        try {
+          const res = await fetch(`${API_BASE}/process_audio_chunk`, { method: 'POST', body: formData });
+          const data = await res.json();
+          if (data.success) updateResultsUI(data.state, data.event);
+        } catch (err) {
+          console.log(err);
+        }
+      };
+
+      // Record in 1 second chunks
+      mediaRecorder.start(1000);
+      isMonitoring = true;
+      btn.textContent = 'Stop Microphone Stream';
+      btn.classList.replace('bg-emerald-500', 'bg-red-500');
+    } catch (err) {
+      alert('Microphone access denied or unavailable.');
     }
   }
 
@@ -882,6 +866,124 @@
     }
   }
 
+  function updateResultsUI(state, event) {
+    document.getElementById('result-status').textContent = state.status;
+    document.getElementById('result-confidence').textContent = state.confidence ? (state.confidence * 100).toFixed(1) + '%' : '—';
+    document.getElementById('result-ood').textContent = state.unknown_score ? state.unknown_score.toFixed(1) : '—';
+    document.getElementById('result-decision').textContent = state.last_alert || '—';
+
+    // Latency if available
+    const latencyEl = document.getElementById('result-latency');
+    if (latencyEl) latencyEl.textContent = state.latency ? state.latency.toFixed(1) + 'ms' : '—';
+
+    const badge = document.getElementById('result-badge');
+    const banner = document.getElementById('alert-banner');
+    badge.className = 'px-3 py-1 rounded-full text-xs font-mono font-semibold uppercase';
+    banner.className = 'p-3 rounded-lg text-sm flex items-center gap-2';
+
+    if (state.is_unknown) {
+      badge.classList.add('status-unknown');
+      banner.classList.add('bg-amber-50', 'text-amber-900');
+      banner.classList.remove('hidden');
+      document.getElementById('alert-icon').textContent = 'warning';
+      document.getElementById('alert-text').textContent = '⚠ Unknown Condition Flagged — Mahalanobis OOD score: ' + state.unknown_score?.toFixed(1) + '. Human Review Agent triggered. Check Review Queue.';
+      
+      // Update UI with review ID
+      if (state.active_review_id) {
+         document.getElementById('alert-text').textContent += ' (Review ID: ' + state.active_review_id + ')';
+      }
+    } else if (state.prediction === 1) {
+      badge.classList.add('status-anomaly');
+      banner.classList.add('bg-red-50', 'text-rose-900');
+      banner.classList.remove('hidden');
+      document.getElementById('alert-icon').textContent = 'error';
+      document.getElementById('alert-text').textContent = '🔴 Known Anomaly Detected — Monitoring Agent issued ALERT. Maintenance required.';
+    } else if (state.prediction === 2) {
+      badge.classList.add('status-new');
+      banner.classList.add('bg-blue-50', 'text-blue-900');
+      banner.classList.remove('hidden');
+      document.getElementById('alert-icon').textContent = 'school';
+      document.getElementById('alert-text').textContent = '🔵 New Condition Recognized — Learning Agent successfully updated model.';
+    } else {
+      badge.classList.add('status-normal');
+      banner.classList.add('hidden');
+    }
+
+    if (state.spectrogram && state.spectrogram.length > 0) {
+      drawRealSpectrogram(state.spectrogram);
+    }
+    if (state.waveform && state.waveform.length > 0) {
+      drawWaveform(state.waveform);
+    }
+    document.getElementById('spectrogram-label').textContent = state.current_machine + ' · Real-time inference · Latency: ' + (state.latency ? state.latency.toFixed(1) : 0) + 'ms';
+  }
+
+  // Draw real spectrogram from 1D array
+  function drawRealSpectrogram(flatData) {
+    const canvas = document.getElementById('spectrogram-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    
+    // mel_spec shape is (64, 313) max
+    const n_mels = 64;
+    const time_frames = flatData.length / n_mels;
+    
+    const cellW = w / time_frames;
+    const cellH = h / n_mels;
+    
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(0, 0, w, h);
+    
+    for (let i = 0; i < n_mels; i++) {
+      for (let j = 0; j < time_frames; j++) {
+        // We flip Y axis so low frequencies are at bottom
+        const val = flatData[i * time_frames + j];
+        
+        // Colormap (dark blue to bright yellow)
+        const intensity = Math.min(1, Math.max(0, val));
+        const r = Math.floor(intensity * 255);
+        const g = Math.floor(intensity * 200);
+        const b = Math.floor((1 - intensity) * 200 + 55);
+        
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(j * cellW, (n_mels - 1 - i) * cellH, cellW + 1, cellH + 1);
+      }
+    }
+  }
+
+  function drawWaveform(waveData) {
+    const canvas = document.getElementById('waveform-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    
+    ctx.fillStyle = '#f8fafc'; // slate-50
+    ctx.fillRect(0, 0, w, h);
+    
+    ctx.beginPath();
+    ctx.strokeStyle = '#0f4c81';
+    ctx.lineWidth = 1;
+    
+    const sliceWidth = w * 1.0 / waveData.length;
+    let x = 0;
+    
+    for (let i = 0; i < waveData.length; i++) {
+      // waveData is typically between -1 and 1
+      const v = waveData[i] * 0.8; // scale down a bit to avoid clipping
+      const y = (h / 2) - (v * h / 2);
+      
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+      x += sliceWidth;
+    }
+    
+    ctx.stroke();
+  }
+
   // Review form submission
   async function handleVerificationSubmit() {
     const selected = document.querySelector('input[name="machineCondition"]:checked');
@@ -895,32 +997,16 @@
       });
     } catch (e) {}
 
-    const toast = document.getElementById('confirmationToast');
-    toast.classList.remove('hidden');
-    setTimeout(() => toast.classList.add('hidden'), 5000);
+    alert("Feedback received and Continual Learning triggered.");
     document.getElementById('pipeline-progress').style.width = '100%';
-    setTimeout(() => document.getElementById('pipeline-progress').style.width = '75%', 2000);
+    setTimeout(() => {
+      document.getElementById('pipeline-progress').style.width = '75%';
+      fetchState(); // refresh UI
+    }, 2000);
   }
 
-  function assignFieldTechnician() {
-    alert('Field dispatch alert sent to Zone C on-duty technician via Plant Radio & Work Order System.');
-  }
-
-  function simulateMobileClick(type) {
-    const map = { 'NORMAL': 'normal', 'ANOMALOUS': 'anomalous', 'NEW STATE': 'new_condition' };
-    const radio = document.querySelector(`input[name="machineCondition"][value="${map[type]}"]`);
-    if (radio) radio.checked = true;
-  }
-
-  function simulateMobileSubmit() {
-    const feedback = document.getElementById('mobileFeedback');
-    feedback.classList.remove('hidden');
-    setTimeout(() => feedback.classList.add('hidden'), 3500);
-    handleVerificationSubmit();
-  }
-
-  // Init spectrogram
-  drawSpectrogram('NORMAL');
+  // Initial fetch
+  fetchState();
 </script>
 </body>
 </html>
