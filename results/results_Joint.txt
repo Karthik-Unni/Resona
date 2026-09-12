@@ -1,7 +1,7 @@
 Method: Joint
-Average Final Accuracy: 98.71%
-Average Forgetting: -5.48%
+Average Final Accuracy: 97.84%
+Average Forgetting: 0.89%
 Accuracy Matrix:
-[[96.52 87.54 98.26]
- [ 0.   89.88 99.11]
- [ 0.    0.   98.76]]
+[[97.97 97.68 97.39]
+ [ 0.   99.4  98.21]
+ [ 0.    0.   97.93]]

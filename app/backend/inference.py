@@ -137,7 +137,13 @@ def run_inference(audio_data: np.ndarray, sample_rate: int, machine_id: str = "u
 
     # ── 3. Compute waveform for UI (downsampled to ~1000 points) ─────────────
     downsample_factor = max(1, len(audio_data) // 1000)
-    waveform = audio_data[::downsample_factor].tolist()
+    waveform_raw = audio_data[::downsample_factor]
+    # Normalize to [-1, 1] so the canvas always shows a visible wave,
+    # regardless of the raw amplitude of the recording.
+    wv_max = np.max(np.abs(waveform_raw))
+    if wv_max > 1e-6:
+        waveform_raw = waveform_raw / wv_max
+    waveform = waveform_raw.tolist()
 
     # ── 4. Log-Mel spectrogram (same params as training) ─────────────────────
     S = librosa.feature.melspectrogram(

@@ -268,6 +268,9 @@ def get_evaluation():
         "Joint": "results/results_Joint.txt",
         "Naive_FT": "results/results_Naive_FT.txt",
         "RESONA_NoReplay": "results/results_RESONA_NoReplay.txt",
+        "EWC": "results/results_EWC.txt",
+        "LwF": "results/results_LwF.txt",
+        "DER++": "results/results_DER++.txt",
     }
     results = {}
     for method, path in result_files.items():
@@ -285,23 +288,27 @@ def get_evaluation():
 def _parse_result_file(content: str) -> dict:
     """Parse a results_*.txt file into structured dict."""
     parsed = {}
+    in_matrix = False
     for line in content.strip().split('\n'):
-        line = line.strip()
-        if line.startswith("Method:"):
-            parsed["method"] = line.split(":", 1)[1].strip()
-        elif line.startswith("Average Final Accuracy:"):
-            parsed["avg_final_accuracy"] = line.split(":", 1)[1].strip()
-        elif line.startswith("Average Forgetting:"):
-            parsed["avg_forgetting"] = line.split(":", 1)[1].strip()
-        elif line.startswith("Accuracy Matrix:"):
-            pass
-        elif line.startswith("[[") or line.startswith(" ["):
-            # Parse matrix rows
-            if "matrix" not in parsed:
-                parsed["matrix"] = []
-            nums = re.findall(r'[\d.]+', line)
-            if nums:
-                parsed["matrix"].append([float(n) for n in nums])
+        stripped = line.strip()
+        if stripped.startswith("Method:"):
+            parsed["method"] = stripped.split(":", 1)[1].strip()
+        elif stripped.startswith("Average Final Accuracy:"):
+            parsed["avg_final_accuracy"] = stripped.split(":", 1)[1].strip()
+        elif stripped.startswith("Average Forgetting:"):
+            parsed["avg_forgetting"] = stripped.split(":", 1)[1].strip()
+        elif stripped.startswith("Accuracy Matrix:"):
+            in_matrix = True
+            parsed["matrix"] = []
+        elif in_matrix:
+            # Match any line that contains matrix bracket data: [[...]], [ ...], etc.
+            # After strip, rows look like: "[[97.68 96.81 95.94]", "[ 0.   99.4  94.05]", "[ 0.    0.   93.78]]"
+            if '[' in stripped:
+                nums = re.findall(r'[-+]?\d*\.?\d+', stripped)
+                if nums:
+                    parsed["matrix"].append([float(n) for n in nums])
+            else:
+                in_matrix = False
     return parsed
 
 

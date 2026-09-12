@@ -2,6 +2,12 @@ import torch
 from torch.utils.data import Dataset
 import numpy as np
 
+import functools
+
+@functools.lru_cache(maxsize=10000)
+def load_numpy_file(file_path):
+    return np.load(file_path)
+
 class MIMIIDataset(Dataset):
     def __init__(self, df, max_time_frames=313):
         self.df = df
@@ -15,8 +21,8 @@ class MIMIIDataset(Dataset):
         file_path = row['file_path']
         label = row['label']
         
-        # Load precomputed numpy array
-        mel_spec = np.load(file_path)
+        # Load precomputed numpy array with RAM caching
+        mel_spec = load_numpy_file(file_path)
         
         # Pad or truncate the time axis to a fixed length (max_time_frames)
         # Shape is usually (n_mels, time_frames)
@@ -33,4 +39,11 @@ class MIMIIDataset(Dataset):
         # Add channel dimension for CNN: (1, n_mels, time_frames)
         mel_spec = np.expand_dims(mel_spec, axis=0)
         
-        return torch.tensor(mel_spec, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+        x = torch.tensor(mel_spec, dtype=torch.float32)
+        y = torch.tensor(label, dtype=torch.long)
+        
+        if 'logit_0' in row.index and 'logit_1' in row.index:
+            logits = torch.tensor([row['logit_0'], row['logit_1']], dtype=torch.float32)
+            return x, y, logits
+        
+        return x, y, torch.tensor([float('nan'), float('nan')], dtype=torch.float32)

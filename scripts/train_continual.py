@@ -58,16 +58,18 @@ def run_experiment():
             "test": test_df
         }
         
-    methods = ["Naive_FT", "Joint", "RESONA_Replay", "RESONA_NoReplay"]
+    methods = ["DER++"]
     
     for method in methods:
         print(f"\n\n{'='*50}\nSTARTING EXPERIMENT: {method}\n{'='*50}")
         
         # Initialize Learner
         config = {**model_config, **cl_config}
+        
+        # We pass the real method name so saving uses the correct filename
         config["method"] = method
+        
         if method == "RESONA_NoReplay":
-            config["method"] = "RESONA_Replay" # Use same logic but 0 memory budget
             config["memory_budget_per_class"] = 0
             
         learner = ContinualLearner(config)

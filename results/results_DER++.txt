@@ -1,0 +1,7 @@
+Method: DER++
+Average Final Accuracy: 94.29%
+Average Forgetting: 2.05%
+Accuracy Matrix:
+[[95.36 95.94 93.62]
+ [ 0.   96.43 94.64]
+ [ 0.    0.   94.61]]

@@ -1,0 +1,7 @@
+Method: EWC
+Average Final Accuracy: 40.64%
+Average Forgetting: 86.23%
+Accuracy Matrix:
+[[97.1  95.65 13.04]
+ [ 0.   98.51 10.12]
+ [ 0.    0.   98.76]]

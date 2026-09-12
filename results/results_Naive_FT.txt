@@ -1,7 +1,7 @@
 Method: Naive_FT
-Average Final Accuracy: 40.55%
-Average Forgetting: 86.80%
+Average Final Accuracy: 62.44%
+Average Forgetting: 53.83%
 Accuracy Matrix:
-[[97.68 91.01 12.17]
- [ 0.   98.81 10.71]
+[[97.1  88.41 38.26]
+ [ 0.   99.11 50.3 ]
  [ 0.    0.   98.76]]

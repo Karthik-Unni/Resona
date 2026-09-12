@@ -1,0 +1,7 @@
+Method: LwF
+Average Final Accuracy: 90.99%
+Average Forgetting: 3.56%
+Accuracy Matrix:
+[[97.68 94.49 97.1 ]
+ [ 0.   94.05 87.5 ]
+ [ 0.    0.   88.38]]

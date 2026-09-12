@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import numpy as np
@@ -25,11 +26,46 @@ class ContinualLearner:
         self.task_history = [] # list of task names we have learned
         self.ood_detector = MahalanobisDetector(threshold_percentile=config.get("ood_threshold_percentile", 95))
         
+        # EWC Specific
+        self.ewc_lambda = config.get("ewc_lambda", 5000)
+        self.fisher = {}
+        self.optpar = {}
+        
+        # LwF Specific
+        self.lwf_alpha = config.get("lwf_alpha", 1.0)
+        self.prev_model = None
+        
+        # DER++ Specific
+        self.der_alpha = config.get("der_alpha", 0.5)
+
+    def compute_fisher(self, df):
+        self.model.eval()
+        dataset = MIMIIDataset(df)
+        loader = DataLoader(dataset, batch_size=32, shuffle=True)
+        fisher = {n: torch.zeros_like(p) for n, p in self.model.named_parameters() if p.requires_grad}
+        
+        for batch_x, batch_y in loader:
+            batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
+            self.model.zero_grad()
+            logits = self.model(batch_x)
+            # Log likelihood
+            log_probs = F.log_softmax(logits, dim=1)
+            # True labels Fisher
+            loss = F.nll_loss(log_probs, batch_y)
+            loss.backward()
+            
+            for n, p in self.model.named_parameters():
+                if p.grad is not None:
+                    fisher[n] += p.grad.data ** 2 / len(loader)
+                    
+        self.fisher = fisher
+        self.optpar = {n: p.data.clone() for n, p in self.model.named_parameters() if p.requires_grad}
+        
     def train_on_task(self, task_name, train_df, val_df=None):
         print(f"--- Training on {task_name} using method {self.method} ---")
         
         # Depending on the method, we construct the actual training dataset
-        if self.method == "RESONA_Replay":
+        if self.method in ["RESONA_Replay", "DER++"]:
             # Combine current task data with replay buffer
             buffer_df = self.buffer.get_buffer_df()
             if not buffer_df.empty:
@@ -38,11 +74,8 @@ class ContinualLearner:
                 print(f"Added {len(buffer_df)} replay samples. Total training size: {len(combined_df)}")
             else:
                 combined_df = train_df
-        elif self.method == "Naive_FT":
-            # Only use current task
-            combined_df = train_df
-        elif self.method == "Joint":
-            # We assume train_df contains all data (Task 1 + Task 2 + etc)
+        elif self.method in ["Naive_FT", "Joint", "EWC", "LwF", "RESONA_NoReplay"]:
+            # Only use current task (or all for Joint)
             combined_df = train_df
         else:
             combined_df = train_df
@@ -52,6 +85,7 @@ class ContinualLearner:
         
         optimizer = optim.Adam(self.model.parameters(), lr=self.config.get("learning_rate", 0.001))
         criterion = nn.CrossEntropyLoss()
+        mse_criterion = nn.MSELoss()
         
         epochs = self.config.get("epochs_per_task", 20)
         
@@ -60,12 +94,44 @@ class ContinualLearner:
             total_loss = 0
             correct = 0
             total = 0
-            for batch_x, batch_y in train_loader:
+            for batch in train_loader:
+                if len(batch) == 3:
+                    batch_x, batch_y, batch_logits = batch
+                    batch_logits = batch_logits.to(self.device)
+                else:
+                    batch_x, batch_y = batch
+                    batch_logits = None
+                    
                 batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
                 
                 optimizer.zero_grad()
                 logits = self.model(batch_x)
                 loss = criterion(logits, batch_y)
+                
+                # EWC Penalty
+                if self.method == "EWC" and self.fisher:
+                    ewc_loss = 0
+                    for n, p in self.model.named_parameters():
+                        if p.requires_grad and n in self.fisher:
+                            ewc_loss += (self.fisher[n] * (p - self.optpar[n]) ** 2).sum()
+                    loss += (self.ewc_lambda / 2) * ewc_loss
+                    
+                # LwF Penalty
+                if self.method == "LwF" and self.prev_model is not None:
+                    with torch.no_grad():
+                        prev_logits = self.prev_model(batch_x)
+                    T = 2.0
+                    log_p = F.log_softmax(logits / T, dim=1)
+                    q = F.softmax(prev_logits / T, dim=1)
+                    lwf_loss = F.kl_div(log_p, q, reduction='batchmean') * (T**2)
+                    loss += self.lwf_alpha * lwf_loss
+                    
+                # DER++ Penalty
+                if self.method == "DER++" and batch_logits is not None:
+                    valid_mask = ~torch.isnan(batch_logits[:, 0])
+                    if valid_mask.sum() > 0:
+                        loss += self.der_alpha * mse_criterion(logits[valid_mask], batch_logits[valid_mask])
+                
                 loss.backward()
                 optimizer.step()
                 
@@ -78,12 +144,34 @@ class ContinualLearner:
             if (epoch + 1) % 5 == 0:
                 print(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(train_loader):.4f}, Acc: {acc:.2f}%")
                 
-        # Update replay buffer if we are using RESONA_Replay
-        if self.method == "RESONA_Replay":
-            self.buffer.add_samples(train_df)
+        # Post-training steps per method
+        if self.method in ["RESONA_Replay", "DER++", "RESONA_NoReplay"]:
+            if self.method == "DER++":
+                self.model.eval()
+                task_ds = MIMIIDataset(train_df)
+                task_loader = DataLoader(task_ds, batch_size=64, shuffle=False)
+                all_logits = []
+                with torch.no_grad():
+                    for batch_data in task_loader:
+                        bx = batch_data[0].to(self.device)
+                        logs = self.model(bx)
+                        all_logits.append(logs.cpu().numpy())
+                all_logits = np.concatenate(all_logits, axis=0)
+                train_df_copy = train_df.copy()
+                train_df_copy['logit_0'] = all_logits[:, 0]
+                train_df_copy['logit_1'] = all_logits[:, 1]
+                self.buffer.add_samples(train_df_copy)
+            else:
+                self.buffer.add_samples(train_df)
+                
+        if self.method == "EWC":
+            self.compute_fisher(train_df)
+            
+        if self.method == "LwF":
+            self.prev_model = copy.deepcopy(self.model)
+            self.prev_model.eval()
             
         # Fit OOD Detector on the latest representation
-        # Extract features for all current + past data (from buffer) to calibrate
         self.calibrate_ood(combined_df)
             
         self.task_history.append(task_name)
@@ -103,7 +191,7 @@ class ContinualLearner:
         all_labels = []
         
         with torch.no_grad():
-            for batch_x, batch_y in loader:
+            for batch_x, batch_y, _ in loader:
                 batch_x = batch_x.to(self.device)
                 _, features = self.model(batch_x, return_features=True)
                 all_features.append(features.cpu().numpy())
@@ -124,7 +212,7 @@ class ContinualLearner:
         total = 0
         
         with torch.no_grad():
-            for batch_x, batch_y in loader:
+            for batch_x, batch_y, _ in loader:
                 batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
                 logits = self.model(batch_x)
                 _, predicted = torch.max(logits.data, 1)
