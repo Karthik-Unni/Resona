@@ -18,7 +18,7 @@
 </p>
 
 > **Research prototype demonstrating Continual Learning for industrial acoustic monitoring.**
-> This is a hackathon-grade research prototype submitted for **TRACK 5 — Continual Learning**.
+
 
 ---
 RESONA — Adaptive Acoustic Intelligence for Machine Monitoring is a deep-learning-based acoustic condition monitoring system designed to detect abnormal machine behavior from sound while continuously adapting to new operating conditions.
@@ -30,18 +30,7 @@ When an unfamiliar condition is detected, the system creates a human-review requ
 The project also includes an edge-oriented deployment architecture, where a simulated Raspberry Pi edge node performs local audio preprocessing, inference, and OOD evaluation before sending compact events to the backend. A web-based industrial HMI provides live monitoring, alerts, review workflows, model status, and evaluation results, while a mobile interface enables field technicians to verify detected conditions.
 
 A major focus of the project is not only classification accuracy, but also continual-learning behavior. We compare different learning strategies and analyze metrics such as final accuracy, forgetting, and backward transfer to evaluate whether the system can learn new acoustic conditions while retaining — and in some cases improving — knowledge of previously learned tasks.
-## 🏆 TRACK 5 — Continual Learning Requirements
 
-**Scoped Problem:** Learn a sequence of tasks without forgetting earlier ones.
-
-**Mandatory Baselines:**
-- **Naive sequential fine-tuning:** (Lower bound — shows catastrophic forgetting).
-- **Joint training on all tasks:** (Upper bound). 
-- *Teams then implement EWC / replay / LwF between the two.* (RESONA implements **Bounded Stratified Replay**).
-
-**Primary Metric:** Average accuracy after the final task + average forgetting (backward transfer).
-
----
 
 ## 📊 Notebook & Proof of Metrics
 
