@@ -179,6 +179,8 @@ python -m pytest tests/ -v
 <img width="500" height="900" alt="image" src="https://github.com/user-attachments/assets/f9e5dad0-bbbc-49b1-a046-1c0e66527a17" />
 <img width="500" height="900" alt="image" src="https://github.com/user-attachments/assets/75353397-1455-4861-b80c-943a7bcda4ff" />
 
+Demo Video: https://youtu.be/nBzHzZfetm0?si=Uwv73Mzw0_dDMyWy
+
 
 
 
